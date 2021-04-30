@@ -53,8 +53,8 @@ pull-deep-sort:
 	cd submodules/deep_sort; \
 		git pull; \
 		git fetch upstream; \
-		git checkout master; \
-		git merge upstream/master;
+		git checkout main; \
+		git merge upstream/main;
 
 ## Local Development 
 
@@ -99,22 +99,13 @@ pull: co
 	git submodule update --remote --merge --recursive
 	git pull
 
-#co-mmdet:
-#	cd submodules/mmdetection; \
-		git pull; \
-		git remote add upstream https://github.com/open-mmlab/mmdetection; \
-		git fetch --tags upstream; \
-		git checkout master; \
-		git merge v2.0.0; \
-		git checkout v2.0.0
-
 merge:
-	git checkout master
+	git checkout main
 	git merge dev
 	git push
 
 tag: require-version
-	git checkout master
+	git checkout main
 	git tag -a v$(version) -m v$(version) 
 	git push origin tags/v$(version)
 
