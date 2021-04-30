@@ -1,2 +1,8 @@
 # ML-Vision
-ML/CV built on torchvision and more.
+
+Common computer vision NNs and ops:
+- torchvision
+- mmdetection
+- Deformable RFCN
+    * `pip install git+https://github.com/necla-ml/Deformable-ConvNets-py3`
+- YOLOv5

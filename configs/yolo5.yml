@@ -1,0 +1,41 @@
+# Detection dataset composition and training for YOLOv5
+
+dataset:
+  name: Retail81
+  root: /mnt/local/datasets/Retail81
+  splits:                                     # data split to process and output
+    train: train.txt
+    val: val.txt
+  sources:
+    coco:
+      force: False                            # whether to overwrite if output split exists
+      root: /mnt/local/datasets/coco
+      splits:
+        train: train2017.txt
+        val: val2017.txt
+    sku110k:
+      force: True
+      root: /mnt/local/datasets/SKU110K
+      splits:
+        train: train.txt
+        val: val.txt
+      rewrites:                               # rewrite source class index
+        0: 81
+    widerperson:
+      force: True
+      root: /mnt/local/datasets/WiderPerson
+      splits:
+        train: train_.txt
+        val: val_.txt
+      rewrites:
+        1: 0
+        2: 0
+        3: 0
+        4: 82
+        5: 83
+
+training:                                     # YOLOv5 training arguments
+  cfg: yolov5x.yaml
+  data: retail81.yaml
+  weights: ''
+  batch_size: 16
