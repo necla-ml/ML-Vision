@@ -1,6 +1,8 @@
 import sys
+from pathlib import Path
+
 import torch
-from ml import nn, hub, logging
+from ml import io, nn, hub, logging
 from ml.nn import functional as F
 
 GITHUB_DETR = dict(
@@ -24,7 +26,7 @@ TAGS_DEFORMABLE_DETR = {
     'main': '61854d0'
 }
 
-def github_detr(tag='main', deformable=False):
+def github(tag='main', deformable=False):
     if deformable:
         tag = TAGS_DEFORMABLE_DETR[tag]
         return hub.github(owner=GITHUB_DEFORMABLE_DETR['owner'], project=GITHUB_DEFORMABLE_DETR['project'], tag=tag)
@@ -80,11 +82,10 @@ def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
     '''
     return chkpt['model']
 
-def detr(pretrained=False, chkpt=None, deformable=False, backbone='resnet50', num_classes=91, model_dir=None, force_reload=False, unload_after=False, **kwargs):
+def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91, model_dir=None, force_reload=False, unload_after=False, **kwargs):
     """
     Kwargs:
-        pretrained(bool, str): True for official checkpoint or path/url to load a custom checkpoint
-        chkpt(str): local checkpoint filename to save
+        pretrained(bool, str): True for official checkpoint or path(str) to load a custom checkpoint
         deformable(bool): deformable successor or original
         backbone(str): feature extraction backbone architecture
         num_classes(int): number of classes to classify
@@ -123,27 +124,30 @@ def detr(pretrained=False, chkpt=None, deformable=False, backbone='resnet50', nu
             logging.info(f"Creating Deformable DETR '{entry}'")
             if panoptic:
                 return_postprocessors = kwargs.get('return_postprocessors', False)
-                m = hub.load(github_detr(tag=tag, deformable=deformable), 
+                m = hub.load(github(tag=tag, deformable=deformable), 
                              entry, 
                              num_classes=num_classes, 
                              return_postprocessor=return_postprocessors, 
                              force_reload=force_reload)
             else:
-                m = hub.load(github_detr(tag=tag, deformable=deformable), 
+                m = hub.load(github(tag=tag, deformable=deformable), 
                              entry, 
                              num_classes=num_classes, 
                              force_reload=force_reload)
             m.tag = tag
-            if isinstance(pretrained, bool) and pretrained:
-                # official pretrained
-                state_dict = from_pretrained(f"{entry}.pt", force_reload=force_reload, gdrive=dict(id=VARIANTS[variant]))
-                m.load_state_dict(state_dict, strict=not False)
-            elif pretrained:
-                # custom checkpoint
-                # state_dict = from_pretrained(chkpt, force_reload=force_reload, gdrive=dict(id=VARIANTS[variant]))
-                # state_dict = {k: v for k, v in state_dict.items() if m.state_dict()[k].shape == v.shape}
-                # m.load_state_dict(state_dict, strict=not False)
-                pass
+            if pretrained:
+                if isinstance(pretrained, bool):
+                    # official pretrained
+                    state_dict = from_pretrained(f"{entry}.pt", force_reload=force_reload, gdrive=dict(id=VARIANTS[variant]))
+                    m.load_state_dict(state_dict, strict=not False)
+                else:
+                    # custom checkpoint
+                    path = Path(pretrained)
+                    if not path.exists():
+                        path = f"{hub.get_dir()}/{pretrained}"
+                    state_dict = io.load(path)
+                    state_dict = {k: v for k, v in state_dict.items() if m.state_dict()[k].shape == v.shape}
+                    m.load_state_dict(state_dict, strict=not False)
         except Exception as e:
             logging.info(f"Failed to load '{entry}': {e}")
         finally:
@@ -172,24 +176,30 @@ def detr(pretrained=False, chkpt=None, deformable=False, backbone='resnet50', nu
             if panoptic:
                 threshold = kwargs.get('threshold', 0.85)
                 return_postprocessor = kwargs.get('return_postprocessor', False)
-                m = hub.load(github_detr(tag=tag), 
+                m = hub.load(github(tag=tag), 
                              entry, 
-                             pretrained=isinstance(pretrained, bool) and pretrained, 
+                             pretrained=pretrained and isinstance(pretrained, bool), 
                              num_classes=num_classes, 
                              threshold=threshold, 
                              return_postprocessor=return_postprocessor, 
                              force_reload=force_reload)
             else:
-                m = hub.load(github_detr(tag=tag), 
+                m = hub.load(github(tag=tag), 
                              entry, 
-                             pretrained=isinstance(pretrained, bool) and pretrained, 
+                             pretrained=pretrained and isinstance(pretrained, bool), 
                              num_classes=num_classes, 
                              force_reload=force_reload)
+                logging.info(f"Loaded {'pretrained' if pretrained and isinstance(pretrained, bool) else ''} '{entry}'")
             m.tag = tag
             if isinstance(pretrained, str):
-                state_dict = from_pretrained(pretrained, model_dir=model_dir, force_reload=force_reload, **kwargs)
+                # custom checkpoint
+                path = Path(pretrained)
+                if not path.exists():
+                    path = f"{hub.get_dir()}/{pretrained}"
+                state_dict = io.load(path)
                 state_dict = {k: v for k, v in state_dict.items() if m.state_dict()[k].shape == v.shape}
                 m.load_state_dict(state_dict, strict=not False)
+                logging.info(f"Loaded custom pretrained '{path}'")
         except Exception as e:
             logging.info(f"Failed to load '{entry}': {e}")
         finally:
