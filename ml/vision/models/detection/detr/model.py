@@ -80,6 +80,7 @@ def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
             m._non_persistent_buffers_set = set()
     return model.float().state_dict()
     '''
+    print(chkpt.keys())
     return chkpt['model']
 
 def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91, model_dir=None, force_reload=False, unload_after=False, **kwargs):
@@ -139,15 +140,16 @@ def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91
                 if isinstance(pretrained, bool):
                     # official pretrained
                     state_dict = from_pretrained(f"{entry}.pt", force_reload=force_reload, gdrive=dict(id=VARIANTS[variant]))
-                    m.load_state_dict(state_dict, strict=not False)
+                    m.load_state_dict(state_dict, strict=True)
+                    m.to('cpu')
                 else:
                     # custom checkpoint
                     path = Path(pretrained)
                     if not path.exists():
                         path = f"{hub.get_dir()}/{pretrained}"
-                    state_dict = io.load(path)
+                    state_dict = io.load(path, map_location='cpu')
                     state_dict = {k: v for k, v in state_dict.items() if m.state_dict()[k].shape == v.shape}
-                    m.load_state_dict(state_dict, strict=not False)
+                    m.load_state_dict(state_dict, strict=True)
         except Exception as e:
             logging.info(f"Failed to load '{entry}': {e}")
         finally:
@@ -155,6 +157,7 @@ def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91
             if unload_after:
                 for module in sys.modules.keys() - modules.keys():
                     del sys.modules[module]
+        m.to('cpu')
         return m
     else:
         '''
@@ -196,9 +199,9 @@ def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91
                 path = Path(pretrained)
                 if not path.exists():
                     path = f"{hub.get_dir()}/{pretrained}"
-                state_dict = io.load(path)
+                state_dict = io.load(path, map_location='cpu')
                 state_dict = {k: v for k, v in state_dict.items() if m.state_dict()[k].shape == v.shape}
-                m.load_state_dict(state_dict, strict=not False)
+                m.load_state_dict(state_dict, strict=True)
                 logging.info(f"Loaded custom pretrained '{path}'")
         except Exception as e:
             logging.info(f"Failed to load '{entry}': {e}")
@@ -207,4 +210,5 @@ def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91
             if unload_after:
                 for module in sys.modules.keys() - modules.keys():
                     del sys.modules[module]
+        m.to('cpu')
         return m
