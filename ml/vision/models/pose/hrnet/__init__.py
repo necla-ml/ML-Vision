@@ -1,1 +1,1 @@
-from .model import posenet
+from .model import posenet, inference

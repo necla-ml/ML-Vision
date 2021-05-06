@@ -12,7 +12,7 @@ GITHUB = dict(
 )
 
 TAGS = {
-    'main': 'cdef7bc',
+    'main': '893bc89',
     'hrnet': '7b9049d',
 }
 
@@ -109,7 +109,17 @@ def posenet(pretrained=False, arch='litehrnet_30_coco_384x288', model_dir=None, 
                     path = f"{hub.get_dir()}/{pretrained}"
                 state_dict = io.load(path, map_location='cpu')
                 state_dict = {k: v for k, v in state_dict.items() if m.state_dict()[k].shape == v.shape}
+                # load_checkpoint(model, path, map_location='cpu')
             m.load_state_dict(state_dict, strict=True)
+        logging.info(f"kwargs={kwargs}")
+        if kwargs.get('fp16', False):
+            from mmpose.core import wrap_fp16_model
+            wrap_fp16_model(m)
+            logging.info(f"[posnet] wrapped in fp16")
+        if kwargs.get('fuse_conv_bn', True):
+            from mmcv.cnn import fuse_conv_bn
+            m = fuse_conv_bn(m)
+            logging.info(f"[posenet] fused conv and bn")
     except Exception as e:
         logging.info(f"Failed to load '{entry}': {e}")
     finally:
@@ -119,3 +129,54 @@ def posenet(pretrained=False, arch='litehrnet_30_coco_384x288', model_dir=None, 
                 del sys.modules[module]
     m.to('cpu')
     return m
+
+def inference(detector, model, img, vis=False, bbox_thr=0.3, kpt_thr=0.3, dataset='TopDownCocoDataset', format='xyxy', return_heatmap=False, **kwargs):
+    import torch as th
+    from ml import cv
+    from ml.vision.ops import dets_select
+    from xtcocotools.coco import COCO
+    from mmpose.apis import (inference_top_down_pose_model, 
+                             init_pose_model,
+                             vis_pose_result)
+
+    model.to('cuda:0')
+    model.eval()
+    # result = model(return_loss=return_loss, **data)
+
+    fp16 = kwargs.get('fp16', False)
+    with th.cuda.amp.autocast(enabled=fp16):
+        dets = detector.detect(img, size=640, conf_thres=0.4, iou_thres=0.5)
+    persons = dets_select(dets, [0])
+    ppls = [dets_f[persons_f].cpu() for dets_f, persons_f in zip(dets, persons)]
+
+
+    """
+    Args:
+        person_results(List[Tensor(N, 5)]): bboxes per class in order with scores
+    """
+    # print(ppls)
+    person_results = [
+        dict(bbox=ppl[:-1])    
+        for ppl in ppls[0]
+    ]
+    # print(person_results)
+    pose_results, returned_outputs = inference_top_down_pose_model(
+            model,
+            img,
+            person_results,
+            bbox_thr=bbox_thr,
+            format=format,
+            dataset=dataset,
+            return_heatmap=return_heatmap,
+            outputs=None)
+    img = cv.imread(img)
+    if vis:
+        vis_img = vis_pose_result(
+                model,
+                img,
+                pose_results,
+                dataset=dataset,
+                kpt_score_thr=kpt_thr,
+                show=False)
+        return pose_results, vis_img
+    return pose_results

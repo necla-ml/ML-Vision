@@ -1,1 +1,1 @@
-from .hrnet import posenet
+from .hrnet import posenet, inference
