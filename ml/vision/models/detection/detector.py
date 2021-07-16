@@ -2,8 +2,10 @@ from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from pathlib import Path
 
+import torchvision.transforms as T
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, TwoMLPHead
 from torchvision.models.detection import maskrcnn_resnet50_fpn
+
 import torch as th
 import numpy as np
 
@@ -51,6 +53,11 @@ def yolo5x(pretrained=False, channels=3, pooling=False, fuse=True, model_dir=Non
     classes = kwargs.pop('classes', len(coco.COCO80_CLASSES))
     m = yolo5x(pretrained, channels=channels, classes=classes, fuse=fuse, model_dir=model_dir, force_reload=force_reload, **kwargs)
     return YOLODetector(m, pooling=pooling)
+
+def detr(pretrained=False, pooling=False, deformable=False, backbone='resnet50', num_classes=91, model_dir=None, force_reload=False, **kwargs):
+    from .detr.model import detr
+    model = detr(pretrained, deformable=deformable, backbone=backbone, num_classes=num_classes, model_dir=model_dir, force_reload=force_reload, **kwargs)
+    return DETRDetector(model, pooling=pooling, **kwargs)
 
 def mask_rcnn(pretrained=False, num_classes=1+90, representation=1024, backbone=None, with_mask=True, **kwargs):
     if backbone is None:
@@ -114,7 +121,7 @@ def mmdet_load(cfg, chkpt=None, with_mask=False, **kwargs):
 ## ML Detector APIs
 
 class Detector(nn.Module):
-    def __init__(self, model, classes=coco.COCO80_CLASSES, rewrites=None):
+    def __init__(self, model, classes=coco.COCO80_CLASSES, rewrites=None, **kwargs):
         '''
         Args:
             model(nn.Module): pre-defined model to make inferences
@@ -345,6 +352,56 @@ class YOLODetector(Detector):
             #print(dets)
             self.train(mode)
             return dets, pooled
+
+class DETRDetector(Detector):
+    def __init__(self, model, pooling=False, **kwargs):
+        super(DETRDetector, self).__init__(model, **kwargs)
+        self.engine = None
+
+        mean = kwargs.get('mean', [0.485, 0.456, 0.406])
+        std = kwargs.get('std', [0.229, 0.224, 0.225])
+        resize = kwargs.get('resize', (800, 800))
+        self.transform = T.Compose([
+            T.ToPILImage(),
+            T.Resize(resize),
+            T.ToTensor(),
+            T.Normalize(mean, std)
+        ])
+
+        self.pooling = pooling
+
+    def forward(self, *args, **kwargs):
+        outputs = self.module(*args, **kwargs)
+        return outputs
+
+    def deploy(self):
+        r"""Deploy optimized runtime backend.
+        """
+        raise NotImplementedError('Deployment for DETR is not supported yet')
+    
+    def detect(self, images, **kwargs):
+        """Perform object detection.       
+        """
+        self.eval()
+        param = next(self.parameters())
+
+        from ml.vision.models.detection import detr
+        conf_thres = kwargs.get('cls_thres', 0.5)
+        
+        batch, sizes = detr.preprocess(images, transform=self.transform)
+        with th.no_grad():
+            if self.engine is None:
+                outputs, recordings = self(batch.to(param.device))
+            else:
+                raise NotImplementedError('DETR engine is not supported yet')
+
+        decoder_out = recordings[0][-1][0][-1] # transformer decoder memory last layer
+        dets, feats = detr.postprocess(outputs, decoder_out, sizes, conf=conf_thres)
+
+        if self.pooling:
+            return dets, feats
+        else:
+            return dets
     
 class THDetector(Detector):
     def __init__(self, model):

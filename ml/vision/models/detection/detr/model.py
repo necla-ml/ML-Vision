@@ -98,6 +98,7 @@ def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91
         panoptic(bool):
         threshold(float):
     """
+    from ml.nn.hooks import LayerRecorder
     if deformable:
         '''
         Deformable DETR from GDrive
@@ -158,7 +159,7 @@ def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91
                 for module in sys.modules.keys() - modules.keys():
                     del sys.modules[module]
         m.to('cpu')
-        return m
+        return LayerRecorder(m, record_layers=[type(m.transformer)])
     else:
         '''
         DETR entry points from hubconf
@@ -211,4 +212,4 @@ def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91
                 for module in sys.modules.keys() - modules.keys():
                     del sys.modules[module]
         m.to('cpu')
-        return m
+        return LayerRecorder(m, record_layers=[type(m.transformer)])
