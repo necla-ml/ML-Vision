@@ -1,9 +1,17 @@
 import pytest
-import torch
+import torch as th
+
+@pytest.fixture
+def img():
+    return th.randint(0, 255, (3, 1080, 810), dtype=th.uint8)
+    
+@pytest.fixture
+def vid():
+    return th.randint(0, 255, (10, 1080, 810, 3), dtype=th.uint8)
 
 @pytest.fixture
 def xyxy():
-    boxes = torch.randint(100, (4, 4))
+    boxes = th.randint(100, (4, 4))
     boxes[:, 2] += boxes[:, 0]
     boxes[:, 3] += boxes[:, 1]
     return boxes
@@ -20,24 +28,24 @@ def xcycwh(xyxy):
 
 @pytest.fixture
 def xyxys():
-    dets = [torch.randn(3, 5) for c in range(4)]
+    dets = [th.randn(3, 5) for c in range(4)]
     dets[0][:, 2:4] += dets[0][:, 0:2]
     dets[2][:, 2:4] += dets[2][:, 0:2]
     dets[1] = None
-    dets[3] = torch.randn(0, 5)
+    dets[3] = th.randn(0, 5)
     return dets
 
 @pytest.fixture
 def xyxysc():
     dets = []
     for c in range(4):
-        boxes = torch.randn(3, 6) * 1280
+        boxes = th.randn(3, 6) * 1280
         boxes[:, -1] = c
         boxes[:, 2:4] += boxes[:, 0:2]
         dets.append(boxes)
-    dets[1] = torch.randn(0, 6)
-    dets[3] = torch.randn(0, 6)
-    return torch.cat(dets)
+    dets[1] = th.randn(0, 6)
+    dets[3] = th.randn(0, 6)
+    return th.cat(dets)
 
 @pytest.fixture
 def retail81():
@@ -69,3 +77,8 @@ def tag():
 @pytest.fixture
 def model_dir():
     return '/tmp/ml'
+
+@pytest.fixture
+def img():
+    return th.randint(0, 255, (3, 1080, 810), dtype=th.uint8)
+    

@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 import torch as th
 
-from ml import cv, deploy, logging
+from ml import deploy, logging
 # from ml.vision.models import yolo4, yolo5, yolo5l, yolo5x, rfcn
 from ml.vision.models.detection import yolo
 from ml.vision.datasets.coco import COCO80_CLASSES

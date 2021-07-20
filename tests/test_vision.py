@@ -2,7 +2,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from ml import cv, logging
+from ml import logging
 from ml.vision.models import yolo4, yolo5, yolo5l, yolo5x, rfcn
 from ml.vision.datasets.coco import COCO80_CLASSES
 from ml.vision.ops import MultiScaleFusionRoIAlign
@@ -154,6 +154,7 @@ TAG_SZ = {
 # @pytest.mark.essential
 @pytest.mark.parametrize("model_dir", [None, '/tmp/ml/hub'])
 def test_yolo5(tile_img, tag, model_dir):
+    from ml import cv
     sz = TAG_SZ[tag]
     path = Path(tile_img)
     img = cv.imread(path)
@@ -204,6 +205,7 @@ def test_yolo5_store(sku_img, wp_img):
 
 # @pytest.mark.essential
 def test_rfcn(tile_img):
+    from ml import cv
     path = Path(tile_img)
     img = cv.imread(path)
     img2 = cv.resize(img, scale=0.5)

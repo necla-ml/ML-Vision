@@ -2,7 +2,7 @@ from pathlib import Path
 import pytest
 import torch as th
 
-from ml import cv, logging
+from ml import logging
 from ml.vision.models import yolo5x
 from ml.vision.datasets.coco import COCO80_CLASSES
 
@@ -11,6 +11,7 @@ from .fixtures import *
 @pytest.mark.parametrize("amp", [True])
 @pytest.mark.parametrize("int8", [True])
 def test_yolo5(benchmark, tile_img, tag, amp, int8):
+    from ml import cv
     path = Path(tile_img)
     img = cv.imread(path)
     img2 = cv.resize(img, scale=0.5)

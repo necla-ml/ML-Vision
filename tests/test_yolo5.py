@@ -5,7 +5,7 @@ from torch.cuda.amp import autocast
 import torch as th
 import numpy as np
 
-from ml import cv, logging
+from ml import logging
 from ml.vision.models import yolo4, yolo5, yolo5l, yolo5x, rfcn
 from ml.vision.models.detection import yolo
 from ml.vision.datasets.coco import COCO80_CLASSES

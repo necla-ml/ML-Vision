@@ -1,4 +1,12 @@
-from torchvision.utils import *
+from typing import *
+from ml import logging
+from torchvision.utils import (
+    make_grid,
+    save_image,
+    draw_bounding_boxes,        # 0.9.0+
+    draw_segmentation_masks,    # 0.10.0+
+)
+import torch
 
 @torch.no_grad()
 def make_grid(

@@ -7,7 +7,7 @@ import torch as th
 from torchvision.transforms import functional as TF
 from torchvision import transforms
 from ml.vision.ops import clip_boxes_to_image
-from ml import cv, nn
+from ml import nn
 import ml
 
 from .fixtures import *

@@ -1,12 +1,56 @@
-from collections.abc import Sequence
+from typing import Union, Sequence
 import torch as th
 
-from ml import cv
+from ml.vision.transforms import functional as F
+from ml.vision.transforms.functional import InterpolationMode
 
 '''
 In need of co-transformation on both input and target with consistent RNG.
 '''
 
+class Resize(th.nn.Module):
+    """Resize the input image to the given size.
+    The image can be a PIL Image or a torch Tensor, in which case it is expected
+    to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions
+    Args:
+        size (sequence or int): Desired output size. If size is a sequence like
+            (h, w), output size will be matched to this. If size is an int,
+            smaller edge of the image will be matched to this number if lossy is True.
+            i.e, if height > width, then image will be rescaled to
+            (size * height / width, size).
+            Otherwise, the longer edge is matched.
+            In torchscript mode padding as single int is not supported, use a tuple or
+            list of length 1: ``[size, ]``.
+        interpolation (int, optional): Desired interpolation enum defined by `filters`_.
+            Default is ``PIL.Image.BILINEAR``. If input is Tensor, only ``PIL.Image.NEAREST``, ``PIL.Image.BILINEAR``
+            and ``PIL.Image.BICUBIC`` are supported.
+    """
+
+    def __init__(self, size: Union[int, Sequence], constraint: str='shorter', interpolation=InterpolationMode.BILINEAR):
+        super().__init__()
+        if not isinstance(size, (int, Sequence)):
+            raise TypeError("Size should be int or sequence. Got {}".format(type(size)))
+        if isinstance(size, Sequence) and len(size) not in (1, 2):
+            raise ValueError("If size is a sequence, it should have 1 or 2 values")
+        self.size = size
+        self.constraint = constraint
+        self.interpolation = interpolation
+
+    def forward(self, img):
+        """
+        Args:
+            img (PIL.Image, cv2 BGR HWC, RGB HWC Tensor): image to resize.
+        Returns:
+            Resized image in the same input format.
+        """
+        print(F.__file__)
+        return F.resize(img, self.size, constraint=self.constraint, interpolation=self.interpolation)
+
+    def __repr__(self):
+        interpolate_str = self.interpolation.value
+        return self.__class__.__name__ + '(size={0}, interpolation={1}), constraint={2}'.format(self.size, interpolate_str, self.constraint)
+
+# TODO no more cv2 dependencies
 class ToCV(th.nn.Module):
     """Convert a ``PIL Image`` to numpy. This transform does not support torchscript.
     Converts a PIL Image or numpy.ndarray (H x W x C) in the range
@@ -30,6 +74,7 @@ class ToCV(th.nn.Module):
         Returns:
             Tensor: Converted image.
         """
+        from ml import cv
         if th.is_tensor(pic):
             return cv.fromTorch(pic)
         else:
@@ -44,46 +89,3 @@ class ToCV(th.nn.Module):
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
-
-class Resize(th.nn.Module):
-    """Resize the input image to the given size.
-    The image can be a PIL Image or a torch Tensor, in which case it is expected
-    to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions
-    Args:
-        size (sequence or int): Desired output size. If size is a sequence like
-            (h, w), output size will be matched to this. If size is an int,
-            smaller edge of the image will be matched to this number if lossy is True.
-            i.e, if height > width, then image will be rescaled to
-            (size * height / width, size).
-            Otherwise, the longer edge is matched.
-            In torchscript mode padding as single int is not supported, use a tuple or
-            list of length 1: ``[size, ]``.
-        interpolation (int, optional): Desired interpolation enum defined by `filters`_.
-            Default is ``PIL.Image.BILINEAR``. If input is Tensor, only ``PIL.Image.NEAREST``, ``PIL.Image.BILINEAR``
-            and ``PIL.Image.BICUBIC`` are supported.
-    """
-
-    def __init__(self, size, constraint='shorter', interpolation=cv.INTER_LINEAR):
-        super().__init__()
-        if not isinstance(size, (int, Sequence)):
-            raise TypeError("Size should be int or sequence. Got {}".format(type(size)))
-        if isinstance(size, Sequence) and len(size) not in (1, 2):
-            raise ValueError("If size is a sequence, it should have 1 or 2 values")
-        self.size = size
-        self.constraint = constraint
-        self.interpolation = interpolation
-
-    def forward(self, img):
-        """
-        Args:
-            img (PIL.Image, cv2 BGR HWC, RGB HWC Tensor): image to resize.
-        Returns:
-            Resized image in the same input format.
-        """
-        # return F.resize(img, self.size, self.interpolation)
-        return cv.resize(img, self.size, constraint=self.constraint, interpolation=self.interpolation)
-
-    def __repr__(self):
-        from torchvision.transforms.transforms import _pil_interpolation_to_str
-        interpolate_str = _pil_interpolation_to_str[self.interpolation]
-        return self.__class__.__name__ + '(size={0}, interpolation={1})'.format(self.size, interpolate_str)
