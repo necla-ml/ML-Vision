@@ -43,7 +43,6 @@ class Resize(th.nn.Module):
         Returns:
             Resized image in the same input format.
         """
-        print(F.__file__)
         return F.resize(img, self.size, constraint=self.constraint, interpolation=self.interpolation)
 
     def __repr__(self):
