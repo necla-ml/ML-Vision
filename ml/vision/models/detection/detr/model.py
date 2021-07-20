@@ -12,7 +12,7 @@ GITHUB_DETR = dict(
 )
 
 TAGS_DETR = {
-    'main': 'a54b778',    # 11/15/2020
+    'main': 'eb9f7e0',      # 06/30/2021
     'v0.2': '14602a7',      # 06/29/2020
 }
 
@@ -153,6 +153,7 @@ def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91
                     m.load_state_dict(state_dict, strict=True)
         except Exception as e:
             logging.info(f"Failed to load '{entry}': {e}")
+            raise e
         finally:
             # XXX Remove newly imported modules in case of conflict with next load
             if unload_after:
@@ -206,6 +207,7 @@ def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91
                 logging.info(f"Loaded custom pretrained '{path}'")
         except Exception as e:
             logging.info(f"Failed to load '{entry}': {e}")
+            raise e
         finally:
             # XXX Remove newly imported modules in case of conflict with next load
             if unload_after:

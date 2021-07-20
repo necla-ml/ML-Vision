@@ -17,7 +17,7 @@ def shape():
 
 @pytest.fixture
 def dev():
-    return th.device('cuda') if th.cuda.is_available() else torch.device('cpu')
+    return th.device('cuda') if th.cuda.is_available() else th.device('cpu')
 
 @pytest.fixture
 def args(shape, dev):

@@ -44,6 +44,7 @@ def test_detect(benchmark, fps, amp, deformable, backbone, image):
     resize = 400
     detector = detr(
         pretrained=True,
+        pooling=1,
         backbone=backbone,
         deformable=deformable,
         resize=resize
