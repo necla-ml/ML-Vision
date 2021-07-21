@@ -10,12 +10,9 @@ Conversions:
 - toPIL
 - toCV
 """
-
-from typing import Union
-from enum import Enum
-from ml import logging
-from torchvision.transforms.functional import *
 import torch as th
+import torch.nn.functional as F
+import ml.vision.transforms.functional as VF
 
 try:
     import accimage
@@ -35,9 +32,8 @@ def is_pil(img):
     else:
         return isinstance(img, Image.Image)
 
-def resize(img: Tensor, size: Union[int, Tuple[int, int]], constraint: str='shorter', interpolation: InterpolationMode=InterpolationMode.BILINEAR, **kwargs) -> Tensor:
+def resize(img, size, constraint='shorter', interpolation=VF.InterpolationMode.BILINEAR, **kwargs):
     '''Resize input image of PIL/accimage, OpenCV BGR or torch tensor.
-
     Args:
         size(Tuple[int], int): tuple of height and width or length on both sides following torchvision resize semantics
     '''
@@ -62,7 +58,6 @@ def resize(img: Tensor, size: Union[int, Tuple[int, int]], constraint: str='shor
     Returns:
         PIL Image or Tensor: Resized image.
     """
-    from torchvision.transforms import functional as F
     if is_tensor(img):
         H, W = img.shape[-2:]
     else:
@@ -76,14 +71,14 @@ def resize(img: Tensor, size: Union[int, Tuple[int, int]], constraint: str='shor
             else:
                 h, w = size, int(W / H * size)
         else:
-            return F.resize(img, size, interpolation, **kwargs)
+            return VF.resize(img, size, interpolation, **kwargs)
     else:
         h, w = size
-    return F.resize(img, (h, w), interpolation, **kwargs)
+    return VF.resize(img, (h, w), interpolation, **kwargs)
 
-def letterbox(img, size=640, color=114, minimal=True, stretch=False, upscaling=True):
+def letterbox(img, size=640, color=114, minimal=True, stretch=False, upscaling=True, stride=32):
     """Resize and pad to the new shape.
-    Args:
+    Args:cc
         img(BGR): CV2 BGR image
         size[416 | 512 | 608 | 32*]: target long side to resize to in multiples of 32
         color(tuple): Padding color
@@ -93,15 +88,15 @@ def letterbox(img, size=640, color=114, minimal=True, stretch=False, upscaling=T
     """
     # Resize image to a multiple of 32 pixels on both sides 
     # https://github.com/ultralytics/yolov3/issues/232
-    color = isinstance(color, int) and (color,) * img.shape[-1] or color
-    shape = img.shape[:2]
+    color = color
+    shape = img.shape[1:]
     if isinstance(size, int):
         size = (size, size)
 
-    r = py_min(size[0] / shape[0], size[1] / shape[1])
+    r = min(size[0] / shape[0], size[1] / shape[1])
     if not upscaling: 
         # Only scale down but no scaling up for better test mAP
-        r = py_min(r, 1.0)
+        r = min(r, 1.0)
 
     # Compute padding
     ratio = r, r
@@ -111,8 +106,8 @@ def letterbox(img, size=640, color=114, minimal=True, stretch=False, upscaling=T
     dw, dh = size[1] - new_unpad[0], size[0] - new_unpad[1]         # padding on sides
 
     if minimal: 
-        # Padding up to 64 for the short side
-        dw, dh = dw % 64, dh % 64
+        # Padding up to stride for the short side
+        dw, dh = dw % stride, dh % stride
     elif stretch:  
         # Stretch the short side to the exact target size
         dw, dh = 0.0, 0.0
@@ -123,13 +118,13 @@ def letterbox(img, size=640, color=114, minimal=True, stretch=False, upscaling=T
     dh /= 2
 
     if shape[::-1] != new_unpad:
-        img = resize(img, (new_unpad[::-1]))
+        img = VF.resize(img, (new_unpad[::-1]))
 
     # Fractional to integral padding
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-    
-    resized = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+
+    resized = F.pad(img, mode='constant', pad=(left, right, top, bottom), value=color)
     return resized, dict(
         shape=shape,        # HxW
         offset=(top, left), # H, W

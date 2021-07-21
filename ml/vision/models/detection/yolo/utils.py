@@ -1,9 +1,9 @@
-from pathlib import Path
-import time
 import torch
 
-from ..... import io, logging
+from ..... import cv, logging
 from ....ops import *
+from ....io import read_image
+from ....transforms.functional import letterbox
 
 def parse(cfg):
     import re
@@ -49,18 +49,22 @@ def parse(cfg):
 def preprocess(image, size=640, **kwargs):
     """Sequential preprocessing of input images for YOLO
     Args:
-        image(str | list[str] | ndarray | list[ndarray]): image filename(s) or CV2 BGR image(s)
+        image(str | list[str] | ndarray | list[ndarray] | list[Tensors]): 
+            image filename(s) or Tensor(RGB[CHW]) | CV BGR image(s)
     Returns:
         images(Tensor[BCHW]):
     """
     import numpy as np
-    from ..... import cv
     if isinstance(image, (str, np.ndarray)):
         images = [image]
     else:
         images = image
+
     if isinstance(images[0], str):
-        images = cv.imread(images)
+        images = [read_image(image) for image in images]
+    elif isinstance(images[0], np.ndarray):
+        images = [cv.toTorch(image) for image in images]
+
     resized = []
     metas = []
 
@@ -70,10 +74,12 @@ def preprocess(image, size=640, **kwargs):
 
     # resize w/ optional padding to a mulitple of 32
     for img in images:
-        img, meta = cv.letterbox(img, size=size, minimal=minimal)
-        resized.append(cv.toTorch(img))
+        img, meta = letterbox(img, size=size, minimal=minimal)
+        resized.append(img)
         metas.append(meta)
-    return torch.stack(resized), metas
+    
+    print(torch.stack(resized).shape)
+    return torch.stack(resized).float(), metas
     
 def batched_nms(predictions, 
                 conf_thres=0.3, iou_thres=0.6, 

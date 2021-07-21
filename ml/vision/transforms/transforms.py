@@ -1,13 +1,12 @@
-from typing import Union, Sequence
+from typing import Sequence
 import torch as th
 
 from ml.vision.transforms import functional as F
-from ml.vision.transforms.functional import InterpolationMode
+from ml.vision.transforms import InterpolationMode
 
 '''
 In need of co-transformation on both input and target with consistent RNG.
 '''
-
 class Resize(th.nn.Module):
     """Resize the input image to the given size.
     The image can be a PIL Image or a torch Tensor, in which case it is expected
@@ -26,7 +25,7 @@ class Resize(th.nn.Module):
             and ``PIL.Image.BICUBIC`` are supported.
     """
 
-    def __init__(self, size: Union[int, Sequence], constraint: str='shorter', interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, constraint='shorter', interpolation=InterpolationMode.BILINEAR):
         super().__init__()
         if not isinstance(size, (int, Sequence)):
             raise TypeError("Size should be int or sequence. Got {}".format(type(size)))
