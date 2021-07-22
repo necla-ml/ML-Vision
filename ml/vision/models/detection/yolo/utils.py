@@ -1,9 +1,10 @@
 import torch
 
-from ..... import cv, logging
+from ml import logging
+from ml.av import io
+from ml.av.transforms import functional as F
 from ....ops import *
-from ....io import read_image
-from ....transforms.functional import letterbox
+from ....utils import letterbox
 
 def parse(cfg):
     import re
@@ -61,7 +62,7 @@ def preprocess(image, size=640, **kwargs):
         images = image
 
     if isinstance(images[0], str):
-        images = [read_image(image) for image in images]
+        images = [io.load(image) for image in images]
     elif isinstance(images[0], np.ndarray):
         images = [cv.toTorch(image) for image in images]
 
@@ -74,7 +75,7 @@ def preprocess(image, size=640, **kwargs):
 
     # resize w/ optional padding to a mulitple of 32
     for img in images:
-        img, meta = letterbox(img, size=size, minimal=minimal)
+        img, meta = letterbox(img, new_shape=size, auto=minimal)
         resized.append(img)
         metas.append(meta)
     

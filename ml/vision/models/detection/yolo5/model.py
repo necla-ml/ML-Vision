@@ -15,6 +15,7 @@ TAGS = {
     'v3.0': 'd0f98c0',
     'v3.1': 'v3.1',
     'v4.0': 'v4.0',
+    'v5.0': 'v5.0',     # required by pytorch=1.8+
 }
 
 class Hardswish(nn.Module):  # export-friendly version of nn.Hardswish()
@@ -49,7 +50,7 @@ def forward_once(self, x, profile=False):
         print('%.1fms total' % sum(dt))
     if self.tag == 'v1.0':
         self.features = [y[i] for i in (17, 21, 25)]
-    elif self.tag in ['v2.0', 'v3.0', 'v3.1', 'v4.0']:
+    elif self.tag in ['v2.0', 'v3.0', 'v3.1', 'v4.0', 'v5.0']:
         self.features = [y[i] for i in (17, 20, 23)]
     else:
         raise ValueError(f"Unsupported version: {GITHUB}")

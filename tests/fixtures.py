@@ -2,10 +2,6 @@ import pytest
 import torch as th
 
 @pytest.fixture
-def img():
-    return th.randint(0, 255, (3, 1080, 810), dtype=th.uint8)
-    
-@pytest.fixture
 def vid():
     return th.randint(0, 255, (10, 1080, 810, 3), dtype=th.uint8)
 
@@ -48,10 +44,6 @@ def xyxysc():
     return th.cat(dets)
 
 @pytest.fixture
-def retail81():
-    return 'configs/yolo5.yml'
-
-@pytest.fixture
 def tile_img():
     return 'assets/bus_zidane_tiles.jpg'
     # TODO download and cache test images
@@ -70,15 +62,17 @@ def wp_img():
     'assets/wider_person-005014.jpg',
 
 @pytest.fixture
-def tag():
-    # YOLOv5 version tag
-    return 'v3.0'
+def img():
+    return th.randint(0, 255, (3, 1080, 810), dtype=th.uint8)
+    
+@pytest.fixture
+def video():
+    import os
+    return '/zdata/projects/shared/datasets/kinetics400/frames-5fps/val/abseiling/GwlcmI36imo_000127_000137'
+    return os.path.join(os.environ['HOME'], 'Videos', 'GwlcmI36imo_000127_000137.mp4')
+    return os.path.join(os.environ['HOME'], 'Videos', 'store720p-short.264')
+    return os.path.join(os.environ['HOME'], 'Videos', 'calstore-concealing.mp4')
 
 @pytest.fixture
 def model_dir():
     return '/tmp/ml'
-
-@pytest.fixture
-def img():
-    return th.randint(0, 255, (3, 1080, 810), dtype=th.uint8)
-    

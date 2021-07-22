@@ -16,7 +16,7 @@ from torchvision.io import (
 #    _read_video_meta_data,
     VideoMetaData,
     Timebase,
-    ImageReadMode,
+#    ImageReadMode, # torchvision=0.10+
     decode_image,
     decode_jpeg,
     decode_png,

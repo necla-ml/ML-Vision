@@ -128,81 +128,6 @@ def test_multiscale_fusion_align():
     logging.info(f"RoI aligned features: {tuple(feats.shape for feats in pooled)}")
     assert list(pooled[0].shape) == [len(rois[0]), 1024+512+256, 3, 3]
 
-def test_yolo4(tile_img):
-    # FIXME no maintained since YOLOv5
-    path = tile_img
-    path = Path(path)
-    img = cv.imread(path)
-    img2 = cv.resize(img, scale=0.5)
-    detector = yolo4(pooling=True, fuse=True)
-    (dets, pooled), features = detector.detect([img, img2], size=608), detector.features
-    print('images:', [(tuple(img.shape), img.mean()) for img in [img, img2]], 
-            'dets:', [tuple(det.shape) for det in dets], 
-            'pooled:', [tuple(feats.shape) for feats in pooled],
-            'features:', [tuple(feats.shape) for feats in features])
-    assert len(dets) == 2
-    assert dets[0].shape[1] == 4+1+1
-    detector.render(img, dets[0], classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}-yolo4.jpg")
-    detector.render(img2, dets[1], classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}2-yolo4.jpg")
-
-TAG_SZ = {
-    'v1.0':736,
-    'v2.0':672,
-    'v3.0':640,
-}
-
-# @pytest.mark.essential
-@pytest.mark.parametrize("model_dir", [None, '/tmp/ml/hub'])
-def test_yolo5(tile_img, tag, model_dir):
-    from ml import cv
-    sz = TAG_SZ[tag]
-    path = Path(tile_img)
-    img = cv.imread(path)
-    img2 = cv.resize(img, scale=0.5)
-    detector = yolo5x(pretrained=True, tag='v3.0', pooling=True, fuse=True, model_dir=model_dir, force_reload=True)
-    assert detector.module.tag == tag
-    print(detector)
-    
-    dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.4, nms_thres=0.5)
-    # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.35, nms_thres=0.5)
-    # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.01, nms_thres=0.65)
-    features = detector.features
-    '''
-    print('images:', [(tuple(img.shape), img.mean()) for img in [img, img2]], 
-            'dets:', [tuple(det.shape) for det in dets], 
-            'pooled:', [tuple(feats.shape) for feats in pooled],
-            'features:', [tuple(feats.shape) for feats in features])
-    print(dets)
-    '''
-    assert len(dets) == 2
-    assert dets[0].shape[1] == 4+1+1
-    cv.render(img, dets[0], score_thr=0.00035, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}-yolo5.jpg")
-    cv.render(img2, dets[1], score_thr=0.00035, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}2-yolo5.jpg")
-
-'''
-def test_yolo5_store(sku_img, wp_img):
-    from ml.vision.datasets.widerperson import WIDERPERSON_CLASSES
-    WIDERPERSON_CLASSES[0] = 'object'
-    sku_img, wp_img = Path(sku_img), Path(wp_img)
-    img = cv.imread(sku_img)
-    img2 = cv.imread(wp_img)
-    model_dir = None # "/tmp/ml/checkpoints"
-    detector = yolo5(name='yolov5x-store', pretrained=True, bucket='eigen-pretrained', key='detection/yolo/yolov5x-store.pt',
-                    classes=len(WIDERPERSON_CLASSES), pooling=True, fuse=True, model_dir=model_dir, force_reload=not True)
-    # dets, pooled = detector.detect([img, img2], size=640, conf_thres=0.4, iou_thres=0.5)
-    dets, pooled = detector.detect([img, img2], size=736, conf_thres=0.35, iou_thres=0.5)
-    # dets, pooled = detector.detect([img, img2], size=736, conf_thres=0.001, iou_thres=0.65)
-    features = detector.features
-    print('images:', [(tuple(img.shape), img.mean()) for img in [img, img2]], 
-            'dets:', [tuple(det.shape) for det in dets], 
-            'pooled:', [tuple(feats.shape) for feats in pooled],
-            'features:', [tuple(feats.shape) for feats in features])
-    assert len(dets) == 2
-    assert dets[0].shape[1] == 4+1+1
-    cv.render(img, dets[0], score_thr=0.35, classes=WIDERPERSON_CLASSES, path=f"export/{sku_img.name[:-4]}-yolo5.jpg")
-    cv.render(img2, dets[1], score_thr=0.35, classes=WIDERPERSON_CLASSES, path=f"export/{wp_img.name[:-4]}2-yolo5.jpg")
-'''
-
 # @pytest.mark.essential
 def test_rfcn(tile_img):
     from ml import cv
@@ -220,14 +145,6 @@ def test_rfcn(tile_img):
     cv.render(img, dets[0], score_thr=0.01, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}-rfcn.jpg")
 
 ## Test Tracking
-
-@pytest.fixture
-def video():
-    import os
-    return '/zdata/projects/shared/datasets/kinetics400/frames-5fps/val/abseiling/GwlcmI36imo_000127_000137'
-    return os.path.join(os.environ['HOME'], 'Videos', 'GwlcmI36imo_000127_000137.mp4')
-    return os.path.join(os.environ['HOME'], 'Videos', 'store720p-short.264')
-    return os.path.join(os.environ['HOME'], 'Videos', 'calstore-concealing.mp4')
 
 def test_yolo_deep_sort(video):
     import numpy as np
