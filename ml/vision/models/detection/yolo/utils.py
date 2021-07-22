@@ -51,7 +51,7 @@ def preprocess(image, size=640, **kwargs):
     """Sequential preprocessing of input images for YOLO
     Args:
         image(str | list[str] | ndarray | list[ndarray] | list[Tensors]): 
-            image filename(s) or Tensor(RGB[CHW]) | CV BGR image(s)
+            image filename(s) or list[Tensor(RGB[CHW])] | CV BGR image(s)
     Returns:
         images(Tensor[BCHW]):
     """
@@ -64,7 +64,7 @@ def preprocess(image, size=640, **kwargs):
     if isinstance(images[0], str):
         images = [io.load(image) for image in images]
     elif isinstance(images[0], np.ndarray):
-        images = [cv.toTorch(image) for image in images]
+        images = [image for image in images]
 
     resized = []
     metas = []
@@ -79,8 +79,7 @@ def preprocess(image, size=640, **kwargs):
         resized.append(img)
         metas.append(meta)
     
-    print(torch.stack(resized).shape)
-    return torch.stack(resized).float(), metas
+    return torch.stack(resized), metas
     
 def batched_nms(predictions, 
                 conf_thres=0.3, iou_thres=0.6, 

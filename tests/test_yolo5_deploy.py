@@ -34,6 +34,10 @@ def batch(batch_size, shape, dev):
     return th.rand(batch_size, *shape)
 
 @pytest.fixture
+def tag():
+    return 'v5.0'
+
+@pytest.fixture
 def detector(tag, dev):
     from ml.vision.models import yolo5x
     detector = yolo5x(pretrained=True, tag=tag, pooling=1, fuse=True, force_reload=False)

@@ -6,7 +6,7 @@ from ml.nn import functional as F
 GITHUB = dict(
     owner='ultralytics',
     project='yolov5',
-    tag='v3.1',
+    tag='v5.0',
 )
 
 TAGS = {
@@ -24,7 +24,7 @@ class Hardswish(nn.Module):  # export-friendly version of nn.Hardswish()
         # return x * F.hardsigmoid(x)  # for torchscript and CoreML
         return x * F.hardtanh(x + 3, 0., 6.) / 6.  # for torchscript, CoreML and ONNX
 
-def github(tag='v3.1'):
+def github(tag='v5.0'):
     tag = TAGS[tag]
     return hub.github(owner=GITHUB['owner'], project=GITHUB['project'], tag=tag)
 

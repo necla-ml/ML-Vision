@@ -1,3 +1,6 @@
+import random
+import numpy as np
+
 def load_mosaic(self, index):
     # loads images in a mosaic
 
