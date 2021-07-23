@@ -108,7 +108,7 @@ def yolo5(chkpt, pretrained=False, channels=3, classes=80, fuse=True, model_dir=
             if isinstance(getattr(module, 'act', None), nn.Hardswish):
                 module.act = Hardswish()
         m.forward_once = types.MethodType(forward_once, m)
-        if tag in ['v2.0', 'v3.0', 'v3.1']:
+        if tag in ['v2.0', 'v3.0', 'v3.1', 'v4.0', 'v5.0']:
             [m.save.append(layer) for layer in (17, 20, 23) if layer not in m.save]
         elif tag == 'v1.0':
             [m.save.append(layer) for layer in (17, 21, 25) if layer not in m.save]

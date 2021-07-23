@@ -129,14 +129,13 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
     if TF.is_tensor(im):
         if shape[::-1] != new_unpad:  # resize
             im = TF.resize(im, new_unpad[::-1], interpolation=TF.InterpolationMode.BILINEAR)
-        im = F.pad(im, mode='constant', pad=(left, right, top, bottom), value=sum(color)/len(color) if isinstance(color, tuple) else color).div(255)
+        im = F.pad(im, mode='constant', pad=(left, right, top, bottom), value=sum(color)/len(color) if isinstance(color, tuple) else color)
     else:
         import cv2
         from .. import cv
         if shape[::-1] != new_unpad:  # resize
             im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
         im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # border padding
-        im = cv.toTorch(im)
         
     return im, dict(
         shape=shape,        # HxW

@@ -237,11 +237,9 @@ def test_yolo4(tile_img):
 # @pytest.mark.essential
 # @pytest.mark.parametrize("model_dir", [None, '/tmp/ml/hub'])
 def test_yolo5(detector, tile_img):
-#    from ml import cv
     from ml.av import io, utils
     from ml.av.transforms import functional as TF
     path = Path(tile_img)
-#    img = cv.imread(path)
     img = io.load(path)
     h, w = img.shape[-2:]
     img2 = TF.resize(img, (h//2, w//2))
@@ -260,12 +258,8 @@ def test_yolo5(detector, tile_img):
     '''
     assert len(dets) == 2
     assert dets[0].shape[1] == 4+1+1
-#    cv.render(img, dets[0], score_thr=0.00035, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}-yolo5.jpg")
-#    cv.render(img2, dets[1], score_thr=0.00035, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}2-yolo5.jpg")
 
     dets0, dets1 = dets[0], dets[1]
-    #dets0 = dets0[dets0[:, 4] >= 0.00035]
-    #dets1 = dets1[dets1[:, 4] >= 0.00035]
     labels0 = [f"{COCO80_CLASSES[int(c)]} {s:.2f}" for s, c in dets0[:, -2:]]
     labels1 = [f"{COCO80_CLASSES[int(c)]} {s:.2f}" for s, c in dets1[:, -2:]]
     print(f"lables0: {labels0}")
