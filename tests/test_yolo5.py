@@ -235,8 +235,7 @@ def test_yolo4(tile_img):
     detector.render(img2, dets[1], classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}2-yolo4.jpg")
 
 # @pytest.mark.essential
-# @pytest.mark.parametrize("model_dir", [None, '/tmp/ml/hub'])
-def test_yolo5(detector, tile_img):
+def test_detection_tv(detector, tile_img):
     from ml.av import io, utils
     from ml.av.transforms import functional as TF
     path = Path(tile_img)
