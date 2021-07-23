@@ -51,7 +51,7 @@ def preprocess(image, size=640, **kwargs):
     """Sequential preprocessing of input images for YOLO
     Args:
         image(str | list[str] | ndarray | list[ndarray] | list[Tensors]): 
-            image filename(s) or Tensor(RGB[CHW]) | CV BGR image(s)
+            image filename(s) or list[Tensor(RGB[CHW])] | CV BGR image(s)
     Returns:
         images(Tensor[BCHW]):
     """
