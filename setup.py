@@ -77,10 +77,8 @@ def write_version_py(path, major=None, minor=None, patch=None, suffix='', sha='U
 __version__ = {repr(version)}
 git_version = {repr(sha)}
 
-import torch
-from ml import _C
-if hasattr(_C, 'CUDA_VERSION'):
-    cuda = _C.CUDA_VERSION
+import torchvision
+cuda = torchvision.version.cuda
 """
 
     with open(path / 'version.py', 'w') as f:

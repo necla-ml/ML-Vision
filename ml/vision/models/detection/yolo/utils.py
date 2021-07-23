@@ -2,7 +2,7 @@ import torch
 
 from ml import logging
 from ml.av import io
-from ml.av.transforms import functional as F
+from ....transforms import functional as TF
 from ....ops import *
 from ....utils import letterbox
 
@@ -63,24 +63,27 @@ def preprocess(image, size=640, **kwargs):
 
     if isinstance(images[0], str):
         images = [io.load(image) for image in images]
-    elif isinstance(images[0], np.ndarray):
-        images = [cv.toTorch(image) for image in images]
-
-    resized = []
-    metas = []
 
     # minimal only when all shapes are the same as in a batch
     shapes = [img.shape for img in images]
     minimal = all(map(lambda s: s == images[0].shape, shapes))
 
+    resized = []
+    metas = []
     # resize w/ optional padding to a mulitple of 32
-    for img in images:
-        img, meta = letterbox(img, new_shape=size, auto=minimal)
-        resized.append(img)
-        metas.append(meta)
+    if TF.is_tensor(images[0]):
+        for img in images:
+            img, meta = letterbox(img, new_shape=size, auto=minimal)
+            resized.append(img)
+            metas.append(meta)
+    else:
+        for img in images:
+            img, meta = letterbox(img, new_shape=size, auto=minimal)
+            resized.append(torch.from_numpy(img).flip(-1).permute(2, 0, 1))
+            metas.append(meta)
     
-    print(torch.stack(resized).shape)
-    return torch.stack(resized).float(), metas
+    resized = torch.stack(resized).to(dtype=torch.get_default_dtype()).div(255)
+    return resized, metas
     
 def batched_nms(predictions, 
                 conf_thres=0.3, iou_thres=0.6, 

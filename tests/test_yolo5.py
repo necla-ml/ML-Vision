@@ -29,7 +29,7 @@ def tag():
 @pytest.fixture
 def detector(tag):
     detector = yolo5x(pretrained=True, tag=tag, pooling=1, fuse=True, force_reload=False)
-    assert detector.module.tag == tag
+    assert detector.tag == tag
     detector.eval()
     return detector.to('cuda' if th.cuda.is_available() else 'cpu')
 
@@ -117,7 +117,7 @@ def test_model_postprocess(benchmark, detector, fps, amp):
     batch = batch.to(param)
     with th.no_grad():
         with amp:
-            predictions = model(batch)
+            predictions = model(batch)[0]
             # predictions = benchmark(model, batch)
             #print('predictions:', predictions.shape)
             cfg = dict(
@@ -160,7 +160,7 @@ def test_model_pooling(benchmark, detector, fps, amp):
     batch = batch.to(param)
     with th.no_grad():
         with amp:
-            predictions = model(batch)
+            predictions = model(batch)[0]
             # predictions = benchmark(model, batch)
             #print('predictions:', predictions.shape)
             cfg = dict(
@@ -235,18 +235,19 @@ def test_yolo4(tile_img):
     detector.render(img2, dets[1], classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}2-yolo4.jpg")
 
 # @pytest.mark.essential
-@pytest.mark.parametrize("model_dir", [None, '/tmp/ml/hub'])
-def test_yolo5(tile_img, tag, model_dir):
-    from ml import cv
-    sz = TAG_SZ[tag]
+# @pytest.mark.parametrize("model_dir", [None, '/tmp/ml/hub'])
+def test_yolo5(detector, tile_img):
+#    from ml import cv
+    from ml.av import io, utils
+    from ml.av.transforms import functional as TF
     path = Path(tile_img)
-    img = cv.imread(path)
-    img2 = cv.resize(img, scale=0.5)
-    detector = yolo5x(pretrained=True, tag='v3.0', pooling=True, fuse=True, model_dir=model_dir, force_reload=True)
-    assert detector.module.tag == tag
+#    img = cv.imread(path)
+    img = io.load(path)
+    h, w = img.shape[-2:]
+    img2 = TF.resize(img, (h//2, w//2))
     print(detector)
     
-    dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.4, nms_thres=0.5)
+    dets, pooled = detector.detect([img, img2], size=TAG_SZ[detector.tag], cls_thres=0.49, nms_thres=0.5)
     # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.35, nms_thres=0.5)
     # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.01, nms_thres=0.65)
     features = detector.features
@@ -259,8 +260,20 @@ def test_yolo5(tile_img, tag, model_dir):
     '''
     assert len(dets) == 2
     assert dets[0].shape[1] == 4+1+1
-    cv.render(img, dets[0], score_thr=0.00035, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}-yolo5.jpg")
-    cv.render(img2, dets[1], score_thr=0.00035, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}2-yolo5.jpg")
+#    cv.render(img, dets[0], score_thr=0.00035, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}-yolo5.jpg")
+#    cv.render(img2, dets[1], score_thr=0.00035, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}2-yolo5.jpg")
+
+    dets0, dets1 = dets[0], dets[1]
+    #dets0 = dets0[dets0[:, 4] >= 0.00035]
+    #dets1 = dets1[dets1[:, 4] >= 0.00035]
+    labels0 = [f"{COCO80_CLASSES[int(c)]} {s:.2f}" for s, c in dets0[:, -2:]]
+    labels1 = [f"{COCO80_CLASSES[int(c)]} {s:.2f}" for s, c in dets1[:, -2:]]
+    print(f"lables0: {labels0}")
+    print(f"lables1: {labels1}")
+    img = utils.draw_bounding_boxes(img, dets0[:, :4], labels=labels0)
+    img2 = utils.draw_bounding_boxes(img2, dets1[:, :4], labels=labels1)
+    io.save(img, f"export/{path.name[:-4]}-yolo5.jpg")
+    io.save(img2, f"export/{path.name[:-4]}2-yolo5.jpg")
 
 '''
 def test_yolo5_store(sku_img, wp_img):
