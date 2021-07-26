@@ -124,7 +124,7 @@ def test_deploy_onnx(benchmark, backbone_x101_32x8d_wsl, dev, batch, B):
         th.testing.assert_allclose(torch_output, th.from_numpy(output).to(dev), rtol=1e-03, atol=3e-04)
 
 @pytest.mark.parametrize("B", [8])
-@pytest.mark.parametrize("fp16", [False])
+@pytest.mark.parametrize("fp16", [True, False])
 @pytest.mark.parametrize("int8", [False])
 @pytest.mark.parametrize("strict", [False])
 def test_deploy_trt(benchmark, batch, backbone_x101_32x8d_wsl, dev, B, fp16, int8, strict):
