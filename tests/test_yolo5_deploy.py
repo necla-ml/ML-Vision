@@ -106,6 +106,6 @@ def test_deploy_trt(benchmark, batch, detector, dev, amp, B):
         pass
     else:
         for torch_preds, preds in zip(torch_meta_preds, meta_preds):
-            th.testing.assert_allclose(torch_preds.float(), preds.float(), rtol=1e-03, atol=3e-04)
+            th.testing.assert_allclose(torch_preds.float(), preds.float(), rtol=1e-03, atol=4e-04)
         for torch_feats, feats in zip(torch_features, features):
-            th.testing.assert_allclose(torch_feats.float(), feats.float(), rtol=1e-03, atol=3e-04)
+            th.testing.assert_allclose(torch_feats.float(), feats.float(), rtol=1e-03, atol=4e-04)
