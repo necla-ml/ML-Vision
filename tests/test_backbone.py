@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 import numpy as np
 import torch as th
-from torchvision.transforms import functional as TF
-from torchvision import transforms
+from ml.vision.transforms import functional as TF
+from ml.vision import transforms
 from ml.vision.ops import clip_boxes_to_image
 from ml import nn
 import ml
@@ -52,19 +52,19 @@ def model(dev):
     return model
 
 def call_backbone_spatial(model, batch):
-    with torch.no_grad():
-        with torch.cuda.amp.autocast(enabled=True):
+    with th.no_grad():
+        with th.cuda.amp.autocast(enabled=True):
             r = model(batch)[-2]
-            torch.cuda.synchronize()
+            th.cuda.synchronize()
             #print(f"r.grad_fn={r.grad_fn}")
             #print(f"i.grad_fn={i.grad_fn}")
             return r
 
 def call_backbone(model, batch):
-    with torch.no_grad():
-        with torch.cuda.amp.autocast(enabled=True):
+    with th.no_grad():
+        with th.cuda.amp.autocast(enabled=True):
             feats = model(batch)[-1]
-            torch.cuda.synchronize()
+            th.cuda.synchronize()
             # print(f"feats.grad_fn={feats.grad_fn}")
             return feats
 
@@ -79,7 +79,7 @@ def test_resnext101_spatial_feats(benchmark, model, normalize, dev, batch_size):
         batch.append(frame)
 
     batch = th.stack(batch)
-    torch.cuda.synchronize()
+    th.cuda.synchronize()
     spatial_feats = benchmark(call_backbone_spatial, model, batch)
     assert spatial_feats.shape[0] == batch_size  
 
@@ -111,6 +111,6 @@ def test_resnext101_feats(benchmark, model, dev, normalize, dets, padding, strea
             batch.append(im_transform(frames[s, :, y1:y2, x1:x2]))
 
     batch = th.stack(batch).to(dev)
-    torch.cuda.synchronize()
+    th.cuda.synchronize()
     feats = benchmark(call_backbone, model, batch)
     assert feats.shape[0] == batch.shape[0]
