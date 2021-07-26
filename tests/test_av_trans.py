@@ -25,7 +25,7 @@ def test_letterbox_pt(size=640, stride=32):
     assert F.is_tensor(im)
     assert F.is_tensor(resized)
 
-@pytest.mark.essential
+#@pytest.mark.essential
 def test_letterbox_cv2(size=640, stride=32):
     im = th.ones((220, 300, 3), dtype=th.uint8).numpy()
     H, W = im.shape[:2]
