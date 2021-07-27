@@ -74,21 +74,24 @@ def test_deploy_onnx(benchmark, batch, detector, dev, B):
         th.testing.assert_allclose(torch_feats, th.from_numpy(feats).to(dev), rtol=1e-03, atol=3e-04)
 
 @pytest.mark.parametrize("B", [5, 10])
-@pytest.mark.parametrize("amp", [False, True])
-#@pytest.mark.parametrize("B", [5])
-#@pytest.mark.parametrize("amp", [False])
-def test_deploy_trt(benchmark, batch, detector, dev, amp, B):
+@pytest.mark.parametrize("fp16", [True, False])
+@pytest.mark.parametrize("int8", [False])
+@pytest.mark.parametrize("strict", [False])
+def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict):
     # FIXME pytorch cuda initialization must be ahead of pycuda
     module = detector.module
     module.model[-1].export = True
     h, w = batch.shape[2:]
-    engine = deploy.build(f"yolo5x-bs{B}_{h}x{w}{amp and '-amp' or ''}",
+    engine = deploy.build(f"yolo5x-bs{B}_{h}x{w}{fp16 and '_fp16' or ''}{int8 and '_int8' or ''}",
                           detector,
                           [batch.shape[1:]],
                           backend='trt', 
                           reload=not True,
                           batch_size=B,
-                          amp=amp)
+                          fp16=fp16,
+                          int8=int8,
+                          strict_type_constraints=strict,
+                          )
 
     outputs = benchmark(engine.predict, batch[:B].to(dev), sync=True)
     # print('outputs:', [output.shape for output in outputs])
@@ -97,11 +100,11 @@ def test_deploy_trt(benchmark, batch, detector, dev, amp, B):
     assert len(meta_preds) == 3
     assert len(features) == 3
     with th.no_grad():
-        with th.cuda.amp.autocast(enabled=amp):
+        with th.cuda.amp.autocast(enabled=fp16):
             torch_meta_preds, torch_features = detector(batch[:B].to(dev))
             # print('torch:', [o.shape for o in torch_meta_preds], [feats.shape for feats in torch_features])
     logging.info(f"outputs trt norm={[preds.norm().item() for preds in meta_preds]}, torch norm={[preds.norm().item() for preds in torch_meta_preds]}")
-    if amp:
+    if fp16:
         #th.testing.assert_allclose(torch_output, th.from_numpy(output[:B]).to(dev), rtol=1e-02, atol=3e-02)
         pass
     else:
