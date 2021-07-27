@@ -9,7 +9,7 @@ from torchvision.utils import (
     draw_bounding_boxes,        # 0.9.0+
     # draw_segmentation_masks,    # 0.10.0+
 )
-import torch
+import torch as th
 
 from ml import logging
 from .transforms import functional as TF
@@ -126,16 +126,15 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
 
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+    if shape[::-1] != new_unpad:  # resize
+        im = TF.resize(im, new_unpad[::-1], interpolation=TF.InterpolationMode.BILINEAR)
     if TF.is_tensor(im):
-        if shape[::-1] != new_unpad:  # resize
-            im = TF.resize(im, new_unpad[::-1], interpolation=TF.InterpolationMode.BILINEAR)
+        #logging.info(f"resized tensor img shape={tuple(im.shape)}, dtype={im.dtype}, sum={im.sum(dim=(1,2))}")
         im = F.pad(im, mode='constant', pad=(left, right, top, bottom), value=sum(color)/len(color) if isinstance(color, tuple) else color)
     else:
-        import cv2
-        from .. import cv
-        if shape[::-1] != new_unpad:  # resize
-            im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
-        im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # border padding
+        from ml.av.backend import opencv as cv
+        #logging.info(f"resized cv img shape={tuple(im.shape)}, dtype={im.dtype}, sum={im.sum(axis=(0,1))}")
+        im = cv.copyMakeBorder(im, top, bottom, left, right, cv.BORDER_CONSTANT, value=color)  # border padding
         
     return im, dict(
         shape=shape,        # HxW
