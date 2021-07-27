@@ -13,7 +13,7 @@ from .fixtures import img, vid
 def test_letterbox_pt(size=640, stride=32):
     im = th.randint(0, 255, (3, 220, 300), dtype=th.uint8)
     H, W = im.shape[-2:]
-    resized, meta = av.utils.letterbox(im, size, stride=stride)
+    resized, meta = av.letterbox(im, size, stride=stride)
     sH = int(round(size / W * H))
     dH = (size - sH) % stride
     top, bottom = int(round(dH / 2 - 0.1)), int(round(dH / 2 + 0.1))
@@ -25,11 +25,11 @@ def test_letterbox_pt(size=640, stride=32):
     assert F.is_tensor(im)
     assert F.is_tensor(resized)
 
-@pytest.mark.essential
+#@pytest.mark.essential
 def test_letterbox_cv2(size=640, stride=32):
     im = th.randint(0, 255, (220, 300, 3), dtype=th.uint8).numpy()
     H, W = im.shape[:2]
-    resized, meta = av.utils.letterbox(im, size, stride=stride)
+    resized, meta = av.letterbox(im, size, stride=stride)
     sH = int(round(size / W * H))
     dH = (size - sH) % stride
     top, bottom = int(round(dH / 2 - 0.1)), int(round(dH / 2 + 0.1))

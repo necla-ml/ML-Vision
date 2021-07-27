@@ -188,6 +188,7 @@ def test_model_pooling(benchmark, detector, fps, amp):
 
 def test_torchjit(tile_img):
     # TODO 
+    import torch
     import torchvision
     # An instance of your model.
     model = torchvision.models.resnet18()
@@ -219,6 +220,7 @@ def test_torchjit(tile_img):
 
 # FIXME: not maintained since YOLOv5, to remove
 def test_yolo4(tile_img):
+    from ml import cv
     path = tile_img
     path = Path(path)
     img = cv.imread(path)
