@@ -115,14 +115,14 @@ def xcycwh2xyxy(x, inplace=False):
     y = torch.zeros_like(x)
     even = (x[:, 2] % 2) == 0
     odd =  (x[:, 2] % 2) == 1
-    y[:, 0][even] = x[:, 0][even] - x[:, 2][even] // 2 + 1
-    y[:, 0][odd] = x[:, 0][odd] - x[:, 2][odd] // 2
+    y[:, 0][even] = x[:, 0][even] - x[:, 2][even].div(2, rounding_mode='floor') + 1
+    y[:, 0][odd] = x[:, 0][odd] - x[:, 2][odd].div(2, rounding_mode='floor')
     even = (x[:, 3] % 2) == 0
     odd =  (x[:, 3] % 2) == 1
-    y[:, 1][even] = x[:, 1][even] - x[:, 3][even] // 2 + 1
-    y[:, 1][odd] = x[:, 1][odd] - x[:, 3][odd] // 2
-    y[:, 2] = x[:, 0] + x[:, 2] // 2
-    y[:, 3] = x[:, 1] + x[:, 3] // 2
+    y[:, 1][even] = x[:, 1][even] - x[:, 3][even].div(2, rounding_mode='floor') + 1
+    y[:, 1][odd] = x[:, 1][odd] - x[:, 3][odd].div(2, rounding_mode='floor')
+    y[:, 2] = x[:, 0] + x[:, 2].div(2, rounding_mode='floor')
+    y[:, 3] = x[:, 1] + x[:, 3].div(2, rounding_mode='floor')
     if inplace:
         x.copy_(y)
         return x
@@ -139,12 +139,12 @@ def xcycwh2xywh(xcycwh, inplace=False):
     xywh = xcycwh if inplace else xcycwh.clone()
     even = (xcycwh[:, 2] % 2) == 0
     odd =  (xcycwh[:, 2] % 2) == 1
-    xywh[:, 0][even] = xcycwh[:, 0][even] - xcycwh[:, 2][even] // 2 + 1
-    xywh[:, 0][odd] = xcycwh[:, 0][odd] - xcycwh[:, 2][odd] // 2
+    xywh[:, 0][even] = xcycwh[:, 0][even] - xcycwh[:, 2][even].div(2, rounding_mode='floor') + 1
+    xywh[:, 0][odd] = xcycwh[:, 0][odd] - xcycwh[:, 2][odd].div(2, rounding_mode='floor')
     even = (xcycwh[:, 3] % 2) == 0
     odd = (xcycwh[:, 3] % 2) == 1
-    xywh[:, 1][even] = xcycwh[:, 1][even] - xcycwh[:, 3][even] // 2 + 1
-    xywh[:, 1][odd] = xcycwh[:, 1][odd] - xcycwh[:, 3][odd] // 2
+    xywh[:, 1][even] = xcycwh[:, 1][even] - xcycwh[:, 3][even].div(2, rounding_mode='floor') + 1
+    xywh[:, 1][odd] = xcycwh[:, 1][odd] - xcycwh[:, 3][odd].div(2, rounding_mode='floor')
     return xywh
 
 def xyxy2xcycwh(xyxy, inplace=False):
@@ -156,8 +156,8 @@ def xyxy2xcycwh(xyxy, inplace=False):
         xcycwh(Tensor[N, 4]): N boxes in (xc,yc,w,h)
     """
     xcycwh = torch.zeros_like(xyxy)
-    xcycwh[:, 0] = (xyxy[:, 0] + xyxy[:, 2]) // 2  # xc
-    xcycwh[:, 1] = (xyxy[:, 1] + xyxy[:, 3]) // 2  # yc
+    xcycwh[:, 0] = (xyxy[:, 0] + xyxy[:, 2]).div(2, rounding_mode='floor')  # xc
+    xcycwh[:, 1] = (xyxy[:, 1] + xyxy[:, 3]).div(2, rounding_mode='floor')  # yc
     xcycwh[:, 2] = xyxy[:, 2] - xyxy[:, 0] + 1     # width
     xcycwh[:, 3] = xyxy[:, 3] - xyxy[:, 1] + 1     # height
     if inplace:
