@@ -14,13 +14,6 @@ from ml.vision.ops import xyxys2xyxysc, xcycwh2xyxy, xcycwh2xywh, xyxy2xcycwh
 
 from .fixtures import *
 
-TAG_SZ = {
-    'v1.0':736,
-    'v2.0':672,
-    'v3.0':640,
-    'v5.0':640,
-}
-
 @pytest.fixture
 def tag():
     # YOLOv5 version tag
@@ -246,7 +239,7 @@ def test_detection_tv(detector, tile_img):
     img2 = TF.resize(img, (h//2, w//2))
     # print(detector)
     
-    dets, pooled = detector.detect([img, img2], size=TAG_SZ[detector.tag], cls_thres=0.49, nms_thres=0.5)
+    dets, pooled = detector.detect([img, img2], size=YOLO5_TAG_SZ[detector.tag], cls_thres=0.49, nms_thres=0.5)
     # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.35, nms_thres=0.5)
     # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.01, nms_thres=0.65)
     features = detector.features

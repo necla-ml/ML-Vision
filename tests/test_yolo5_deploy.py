@@ -112,3 +112,49 @@ def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict):
             th.testing.assert_allclose(torch_preds.float(), preds.float(), rtol=1e-03, atol=4e-04)
         for torch_feats, feats in zip(torch_features, features):
             th.testing.assert_allclose(torch_feats.float(), feats.float(), rtol=1e-03, atol=4e-04)
+
+# @pytest.mark.essential
+def test_detection_tv(detector, tile_img, B=5, fp16=True):
+    from pathlib import Path
+    from ml.av import io, utils
+    from ml.av.transforms import functional as TF
+    path = Path(tile_img)
+    img = io.load(path)
+    h, w = img.shape[-2:]
+    
+    module = detector.module
+    module.model[-1].export = True
+    """
+    engine = deploy.build(f"yolo5x-bs{B}_{h}x{w}{fp16 and '_fp16' or ''}{int8 and '_int8' or ''}",
+                          detector,
+                          [img.shape],
+                          backend='trt', 
+                          reload=not True,
+                          batch_size=B,
+                          fp16=fp16,
+                          int8=int8,
+                          strict_type_constraints=strict,
+                          )
+    """
+    import math
+    scale = YOLO5_TAG_SZ[detector.tag]
+    if w > h:
+        spec = (3, 32 * math.ceil(h / w * scale / 32), scale)
+    else:
+        spec = (3, scale, 32 * math.ceil(w / h * scale / 32))
+    print(f"spec={spec}") 
+    detector.deploy('yolo5x', 
+                    batch_size=B, 
+                    spec=spec, 
+                    fp16=fp16, 
+                    backend='trt', 
+                    reload=not True)
+    dets, pooled = detector.detect([img], size=scale, cls_thres=0.49, nms_thres=0.5)
+    assert len(dets) == 1
+    assert dets[0].shape[1] == 4+1+1
+
+    dets0 = dets[0]
+    labels0 = [f"{COCO80_CLASSES[int(c)]} {s:.2f}" for s, c in dets0[:, -2:]]
+    print(f"lables0: {labels0}")
+    img = utils.draw_bounding_boxes(img, dets0, labels=COCO80_CLASSES)
+    io.save(img, f"export/{path.name[:-4]}-yolo5x_trt.png")
