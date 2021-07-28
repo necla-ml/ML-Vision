@@ -10,6 +10,13 @@ import pytest
 from .fixtures import img, vid
 
 @pytest.mark.essential
+def test_gen_patches():
+    im = th.randint(0, 255, (3, 720, 1280), dtype=th.uint8)
+    img_patches, boxes = av.utils.gen_patches(im, resize=640, patch_size=(128, 320))
+    assert img_patches.shape[0] == 10
+
+
+@pytest.mark.essential
 def test_letterbox_pt(size=640, stride=32):
     im = th.randint(0, 255, (3, 220, 300), dtype=th.uint8)
     H, W = im.shape[-2:]
