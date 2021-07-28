@@ -254,12 +254,12 @@ def draw_bounding_boxes(
             if bbox[1] > h + margin:
                 x1, y1 = bbox[0], bbox[1] - (h + margin)
                 x2, y2 = x1 + w + 2 * margin, bbox[1] - width // 2
-                draw.rectangle((x1, y1, x2, y2), width=0, outline=None, fill=(255//2, 255//2, 255//2, 255*6//10))
+                draw.rectangle((x1, y1, x2, y2), width=0, outline=None, fill=(255//2, 255//2, 255//2, 100))
                 draw.text((x1 + margin, y1), labels[i], fill=color, font=font)
             else:
                 x1, y1 = bbox[0] + width, bbox[1] + width
                 x2, y2 = x1 + w + 2 * margin, y1 + h + width
-                draw.rectangle((x1, y1, x2, y2), width=0, outline=None, fill=(255//2, 255//2, 255//2, 255*6//10))
+                draw.rectangle((x1, y1, x2, y2), width=0, outline=None, fill=(255//2, 255//2, 255//2, 100))
                 draw.text((x1 + margin, y1), labels[i], fill=color, font=font)
 
     return th.from_numpy(np.array(img_to_draw)).permute(2, 0, 1).to(dtype=th.uint8)
