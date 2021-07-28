@@ -14,13 +14,6 @@ from ml.vision.ops import xyxys2xyxysc, xcycwh2xyxy, xcycwh2xywh, xyxy2xcycwh
 
 from .fixtures import *
 
-TAG_SZ = {
-    'v1.0':736,
-    'v2.0':672,
-    'v3.0':640,
-    'v5.0':640,
-}
-
 @pytest.fixture
 def tag():
     # YOLOv5 version tag
@@ -28,7 +21,7 @@ def tag():
 
 @pytest.fixture
 def detector(tag):
-    detector = yolo5x(pretrained=True, tag=tag, pooling=1, fuse=True, force_reload=False)
+    detector = yolo5x(pretrained=True, tag=tag, pooling=1, fuse=True, force_reload=False, unload_after=True)
     assert detector.tag == tag
     detector.eval()
     return detector.to('cuda' if th.cuda.is_available() else 'cpu')
@@ -244,9 +237,9 @@ def test_detection_tv(detector, tile_img):
     img = io.load(path)
     h, w = img.shape[-2:]
     img2 = TF.resize(img, (h//2, w//2))
-    print(detector)
+    # print(detector)
     
-    dets, pooled = detector.detect([img, img2], size=TAG_SZ[detector.tag], cls_thres=0.49, nms_thres=0.5)
+    dets, pooled = detector.detect([img, img2], size=YOLO5_TAG_SZ[detector.tag], cls_thres=0.49, nms_thres=0.5)
     # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.35, nms_thres=0.5)
     # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.01, nms_thres=0.65)
     features = detector.features
@@ -265,10 +258,10 @@ def test_detection_tv(detector, tile_img):
     labels1 = [f"{COCO80_CLASSES[int(c)]} {s:.2f}" for s, c in dets1[:, -2:]]
     print(f"lables0: {labels0}")
     print(f"lables1: {labels1}")
-    img = utils.draw_bounding_boxes(img, dets0[:, :4], labels=labels0)
-    img2 = utils.draw_bounding_boxes(img2, dets1[:, :4], labels=labels1)
-    io.save(img, f"export/{path.name[:-4]}-yolo5.jpg")
-    io.save(img2, f"export/{path.name[:-4]}2-yolo5.jpg")
+    img = utils.draw_bounding_boxes(img, dets0, labels=COCO80_CLASSES)
+    img2 = utils.draw_bounding_boxes(img2, dets1, labels=COCO80_CLASSES)
+    io.save(img, f"export/{path.name[:-4]}-yolo5.png")
+    io.save(img2, f"export/{path.name[:-4]}2-yolo5.png")
 
 '''
 def test_yolo5_store(sku_img, wp_img):

@@ -94,7 +94,7 @@ def yolo5(chkpt, pretrained=False, channels=3, classes=80, fuse=True, model_dir=
         s3(dict): S3 source containing bucket and key to download a checkpoint from
     """
     import types
-    tag = kwargs.get('tag', 'v3.1')
+    tag = kwargs.get('tag', 'v5.0')
     modules = sys.modules.copy()
     try:
         m = hub.load(github(tag=tag), chkpt[:len('yolov5x')], False, channels, classes, force_reload=force_reload)
