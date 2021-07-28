@@ -13,7 +13,7 @@ import torch as th
 import numpy as np
 
 from ml import logging
-import .transforms as T
+import ml.vision.transforms as T
 from .transforms import functional as TF
 
 BLACK    = (  0,   0,   0)
@@ -167,7 +167,7 @@ def gen_patches(img, patch_size=(144, 320), resize=(720, 1280)):
     assert rH % pH == 0 and rH >= pH, 'Cannot divide height into equal patches'
     assert rW % pW == 0 and rW >= pW, 'Cannot divide width into equal patches'
 
-    trans = T.Compose([T.ToPILImage(), TF.Resize(resize, constraint='longer'), T.ToTensor()])
+    trans = T.Compose([T.ToPILImage(), T.Resize(resize, constraint='longer'), T.ToTensor()])
     img_patches = trans(img).unfold(1, pH, pH).unfold(2, pW, pW) 
 
     rows = int(rW / pW)

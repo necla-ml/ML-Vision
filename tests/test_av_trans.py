@@ -11,10 +11,17 @@ from .fixtures import img, vid
 
 @pytest.mark.essential
 def test_gen_patches():
+    H = 128
+    W = 320
+    patch_size = (H, W)
     im = th.randint(0, 255, (3, 720, 1280), dtype=th.uint8)
-    img_patches, boxes = av.utils.gen_patches(im, resize=640, patch_size=(128, 320))
-    assert img_patches.shape[0] == 10
-
+    img_patches, boxes = av.utils.gen_patches(im, resize=640, patch_size=patch_size)
+    rows = 640 / W
+    cols = 640 / H
+    assert img_patches.shape[0] == rows * cols
+    assert img_patches.shape[1] == 3
+    assert img_patches.shape[2] == H
+    assert img_patches.shape[3] == W
 
 @pytest.mark.essential
 def test_letterbox_pt(size=640, stride=32):
