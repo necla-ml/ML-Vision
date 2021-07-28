@@ -21,7 +21,7 @@ def tag():
 
 @pytest.fixture
 def detector(tag):
-    detector = yolo5x(pretrained=True, tag=tag, pooling=1, fuse=True, force_reload=False)
+    detector = yolo5x(pretrained=True, tag=tag, pooling=1, fuse=True, force_reload=False, unload_after=True)
     assert detector.tag == tag
     detector.eval()
     return detector.to('cuda' if th.cuda.is_available() else 'cpu')

@@ -40,14 +40,15 @@ def image():
 @pytest.mark.parametrize("backbone", ['resnet50', 'resnet101'])
 def test_detect(benchmark, fps, amp, deformable, backbone, image):
     # setup model
-    from ml.vision.models.detection.detector import detr
+    # from ml.vision.models.detection.detector import detr
     resize = 400
     detector = detr(
         pretrained=True,
         pooling=1,
         backbone=backbone,
         deformable=deformable,
-        resize=resize
+        resize=resize,
+        unload_after=True,
     )
     detector.eval()
     detector.to('cuda' if th.cuda.is_available() else 'cpu')
