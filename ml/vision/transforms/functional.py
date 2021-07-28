@@ -90,16 +90,8 @@ def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shor
     else:
         h, w = size
     
-    from ml import logging
     if is_cv2(img):
         from ml.av.backend import opencv as cv
-        logging.info(f"cv img shape={tuple(img.shape)}, dtype={img.dtype}, sum={img.sum(axis=(0,1))}")
         return cv.resize(img, (w, h), interpolation=cv.INTER_LINEAR)
     else:
-        if is_tensor(img):
-            logging.info(f"tensor img shape={tuple(img.shape)}, dtype={img.dtype}, sum={img.sum(dim=(1,2))}")
-        else:
-            import numpy as np
-            img_np = np.array(img)
-            logging.info(f"PIL img shape={tuple(img_np.shape)}, dtype={img_np.dtype}, sum={img_np.sum(axis=(0,1))}")
         return TF.resize(img, (h, w), interpolation, **kwargs)
