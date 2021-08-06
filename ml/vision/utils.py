@@ -199,9 +199,9 @@ def draw_bounding_boxes(
     labels: Optional[List[str]] = None,
     colors: Optional[Union[List[Union[str, Tuple[int, int, int]]], str, Tuple[int, int, int]]] = None,
     fill: Optional[bool] = False,
-    width: int = 2,
+    width: int = 3,
     font: Optional[str] = None,
-    font_size: int = 14,
+    font_size: int = 16,
     alpha: Optional[int] = 100,
 ) -> th.Tensor:
     r"""Draws bounding boxes on given image in CHW, uint8.
