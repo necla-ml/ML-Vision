@@ -13,6 +13,7 @@ import torch as th
 import numpy as np
 
 from ml import logging
+import ml.vision.transforms as T
 from .transforms import functional as TF
 
 BLACK    = (  0,   0,   0)
@@ -142,6 +143,54 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
         offset=(top, left), # offH, offW
         ratio=ratio,        # rH, rW
     )
+
+def gen_patches(img, patch_size=(144, 320), resize=(720, 1280)):
+    """
+    Args:
+        img: Tensor(C, H, W)
+        patch_size: Tuple([H, W])
+        resize: Tuple([H, W])
+    Returns:
+        img_patches: Tensor(P, C, H ,W)
+        normalized cordinates: Tensor(P, x1, y1, x2, y2)
+    """
+    C = img.shape[0]
+
+    if isinstance(patch_size, int):
+        patch_size = (patch_size, patch_size)
+    if isinstance(resize, int):
+        resize = (resize, resize)
+
+    pH, pW = patch_size
+    rH, rW = resize
+
+    assert rH % pH == 0 and rH >= pH, 'Cannot divide height into equal patches'
+    assert rW % pW == 0 and rW >= pW, 'Cannot divide width into equal patches'
+
+    trans = T.Compose([T.ToPILImage(), T.Resize(resize, constraint='longer'), T.ToTensor()])
+    img_patches = trans(img).unfold(1, pH, pH).unfold(2, pW, pW) 
+
+    rows = int(rW / pW)
+    cols = int(rH / pH)
+
+    xyxy = []
+    x1, y1, x2, y2 = 0, 0, 0, 0
+    j = 0
+    for _ in range(rows * cols):
+        h, w = pH, pW
+        if j % rows == 0:
+            y1 = y2
+            y2 = y2 + h
+            j = 0
+        x1 = j * w
+        x2 = x1 + w
+        j += 1
+        xyxy.append(th.tensor([x1/rW, y1/rH, x2/rW, y2/rH]))
+
+    img_patches = img_patches.reshape(C, -1, pH, pW).permute(1, 0, 2, 3)
+    xyxy = th.stack(xyxy)
+    
+    return img_patches, xyxy
 
 @th.no_grad()
 def draw_bounding_boxes(
