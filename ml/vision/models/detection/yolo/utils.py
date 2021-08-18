@@ -84,7 +84,7 @@ def preprocess(image, size=640, **kwargs):
     
     resized = torch.stack(resized).to(dtype=torch.get_default_dtype()).div(255)
     return resized, metas
-    
+
 def batched_nms(predictions, 
                 conf_thres=0.3, iou_thres=0.6, 
                 agnostic=False, merge=True, 
