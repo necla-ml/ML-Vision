@@ -8,12 +8,12 @@ from ml import (
 
 @pytest.fixture
 def batch_size():
-    return 8
+    return 16
 
 @pytest.fixture
 def shape():
-    # return 3, 224, 224
-    return 3, 720, 1280
+    return 3, 224, 224
+    # return 3, 720, 1280
 
 @pytest.fixture
 def dev():
@@ -123,13 +123,29 @@ def test_deploy_onnx(benchmark, backbone_x101_32x8d_wsl, dev, batch, B):
         np.testing.assert_allclose(torch_output.cpu().numpy(), output, rtol=1e-03, atol=3e-04)
         th.testing.assert_allclose(torch_output, th.from_numpy(output).to(dev), rtol=1e-03, atol=3e-04)
 
-@pytest.mark.parametrize("B", [8])
+@pytest.mark.parametrize("B", [16])
 @pytest.mark.parametrize("fp16", [True, False])
 @pytest.mark.parametrize("int8", [False])
 @pytest.mark.parametrize("strict", [False])
-def test_deploy_trt(benchmark, batch, backbone_x101_32x8d_wsl, dev, B, fp16, int8, strict):
+@pytest.mark.parametrize("max_inp_size", [(224, 224)])
+@pytest.mark.parametrize("min_inp_size", [(224, 224)])
+def test_deploy_trt(benchmark, batch, backbone_x101_32x8d_wsl, dev, B, fp16, int8, strict, min_inp_size, max_inp_size):
     from ml import hub
-    maxH, maxW = 720, 1280
+    # dynamic/static input
+    minH, minW = min_inp_size
+    maxH, maxW = max_inp_size
+    min_shapes = [(3, minH, minW)]
+    max_shapes = [(3, maxH, maxW)]
+    spec = [(3, minH, minW)]
+    dynamic_axes={'input_0': {0: 'batch_size'}}
+    if maxH != minH:
+        spec[0][1] = -1
+        dynamic_axes['input_0'][2] = 'height'
+    if maxW != minW:
+        spec[0][2] = -1
+        dynamic_axes['input_0'][3] = 'width'
+
+    # int 8 configs
     int8_calib_data = 'data/ILSVRC2012/val'
     int8_calib_max = 5000 * 4
     int8_calib_batch_size = max(B, 512 * 4)
@@ -139,13 +155,13 @@ def test_deploy_trt(benchmark, batch, backbone_x101_32x8d_wsl, dev, B, fp16, int
     int8_calib_cache = f"{hub.get_dir()}/{cache}.cache"
     engine = deploy.build(name,
                           backbone_x101_32x8d_wsl,
-                          [(3, -1, -1)],
+                          spec=spec,
                           backend='trt',
                           reload=not True,
                           batch_size=B,
-                          dynamic_axes={'input_0': {0: 'batch_size', 2: 'height', 3: 'width'}},
-                          min_shapes=[(3, 224, 224)],
-                          max_shapes=[(3, maxH, maxW)],
+                          dynamic_axes=dynamic_axes,
+                          min_shapes=min_shapes,
+                          max_shapes=max_shapes,
                           fp16=fp16,
                           int8=int8,
                           strict_type_constraints=strict,

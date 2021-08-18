@@ -14,7 +14,7 @@ from .fixtures import *
 
 @pytest.fixture
 def batch_size():
-    return 10
+    return 20
 
 @pytest.fixture
 def shape():
