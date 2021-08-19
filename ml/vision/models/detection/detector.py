@@ -301,7 +301,7 @@ class YOLODetector(Detector):
 
         from ml.vision.models.detection import yolo
         mosaic = kwargs.get('mosaic', False)
-        pooling = kwargs.get('pooling', False)
+        batch_preprocess = kwargs.get('batch_preprocess', False)
         size = kwargs.get('size', 640)
         cfg = dict(
             conf_thres = kwargs.get('cls_thres', 0.4),
@@ -309,7 +309,7 @@ class YOLODetector(Detector):
             agnostic = kwargs.get('agnostic', False),
             merge = kwargs.get('merge', True),
         )
-        batch, metas = yolo.preprocess(images, size=size)
+        batch, metas = batch_preprocess and yolo.batched_preprocess(images.to(param.device), size=size) or yolo.preprocess(images, size=size)
         with th.no_grad():
             if self.engine is None:
                 outputs, features = self(batch.to(param.device))

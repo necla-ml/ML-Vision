@@ -30,29 +30,27 @@ class MultiScaleFusionRoIAlign(nn.Module):
         Returns:
             aligned(List[Tensor[K, C, OH, OW]]): list of pooled RoI features w.r.t. boxes
         """
-        from time import time
-        
         size = x[0].shape[2:]
         resampled = [x[0]]
-        #t = time()
+        # t = time()
         for i, feats in enumerate(x[1:], 1):
             interpolated = F.interpolate(feats, scale_factor=2 ** i, mode='bilinear', align_corners=False)
             resampled.append(interpolated)
             # logging.info(f"interploation from {tuple(feats.shape)} to {tuple(interpolated.shape)}")
         batch = torch.cat(resampled, 1)
-        #torch.cuda.synchronize()
-        #print("batch interpolation elapse:", time() - t)
+        # torch.cuda.synchronize()
+        # print("batch interpolation elapse:", time() - t)
 
         # XXX pooling w.r.t. the resized/padded image sizes
-        #t = time()
+        # t = time()
         if torch.is_tensor(boxes):
             rois = rois2boxes(rois.clone(), len(metas))
         else:
             rois = [dets_f[:,:4].clone() for dets_f in boxes]
-        #torch.cuda.synchronize()
-        #print("batch rois2boxes elapse:", time() - t)
+        # torch.cuda.synchronize()
+        # print("batch rois2boxes elapse:", time() - t)
         
-        #t = time()
+        # t = time()
         rois_rp = []
         scale = None
         for dets_rp, meta in zip(rois, metas):
@@ -67,11 +65,11 @@ class MultiScaleFusionRoIAlign(nn.Module):
                 shape[1] = int(shape[1] * rW + 2 * left)
                 scale = (size[1]/shape[1], size[0]/shape[0])
             #print(scale, meta, shape, tuple(size))
-        #torch.cuda.synchronize()
-        #print("batch roi_align prep:", time() - t)
+        # torch.cuda.synchronize()
+        # print("batch roi_align prep:", time() - t)
         
         # FIXME roi_align() is very slow when output_size is small
-        #t = time()
+        # t = time()
         if self.output_size[0] == 1:
             aligned = roi_align(batch, rois_rp, (7, 7), spatial_scale=scale)
             if len(aligned) > 0:
@@ -86,6 +84,6 @@ class MultiScaleFusionRoIAlign(nn.Module):
         for dets in rois:
             alignedL.append(aligned[offset:offset+len(dets)])
             offset += len(dets)
-        #torch.cuda.synchronize()
-        #print(f"batch roi_align{tuple(aligned.shape)}:", time() - t)
+        # torch.cuda.synchronize()
+        # print(f"batch roi_align{tuple(aligned.shape)}:", time() - t)
         return alignedL

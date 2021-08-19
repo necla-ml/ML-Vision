@@ -4,7 +4,7 @@ from ml import logging
 from ml.av import io
 from ....transforms import functional as TF
 from ....ops import *
-from ....utils import letterbox
+from ....utils import letterbox, batched_letterbox
 
 def parse(cfg):
     import re
@@ -83,6 +83,20 @@ def preprocess(image, size=640, **kwargs):
             metas.append(meta)
     
     resized = torch.stack(resized).to(dtype=torch.get_default_dtype()).div(255)
+    return resized, metas
+
+def batched_preprocess(images, size=640, **kwargs):
+    """Batch preprocessing of input images of same shapes for YOLO
+    Args:
+        images(Tensor[BCHW]):
+    Returns:
+        images(Tensor[BCHW]):
+    """
+    # resize w/ optional padding to a mulitple of 32
+    resized, meta = batched_letterbox(images, new_shape=size, auto=True)
+    metas = [meta] * len(images)
+    
+    resized = resized.to(dtype=torch.get_default_dtype()).div(255)
     return resized, metas
 
 def batched_nms(predictions, 
@@ -164,7 +178,7 @@ def postprocess(predictions, metas,
     Args:
         predictions(Tensor[B,K,4+1+80]): batch output predictions from YOLO
     Returns:
-        dets(xyxysc): 
+        dets(xyxysc):
     """
     dets = [None] * len(predictions)
     predictions = batched_nms(predictions, conf_thres, iou_thres, agnostic, merge, multi_label, classes)
