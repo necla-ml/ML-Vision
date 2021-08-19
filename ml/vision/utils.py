@@ -80,6 +80,61 @@ def pts(pts):
         pts = [[list(p)] for p in pts]
     return np.array(pts)
 
+def batched_letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
+    r"""Resize and pad to a multiple of strides for object detection.
+
+    src: utils.augmentation.letterbox
+    
+    Args:
+        im (Tensor[CHW, dtype=uint8]): RGB tensor
+        new_shape (int, Tuple[int, int]): target size of resize and padding
+        color (Tuple[int, int, int]): color to pad the borders
+        auto (bool): True forr minimal rectangle
+        scaleFill: stretch to fill
+
+    Returns:
+        resized (Tensor[CHW, uint8], ndarray[HWC, uint8]): scaled image with potential padding to a multiple of 32 w.r.t. the longer side
+        meta (Dict): { original shape, offset, ratio } 
+    """
+    
+    # Resize and pad image while meeting stride-multiple constraints
+    shape = im.shape[-2:]
+
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape)
+
+    # Scale ratio (new / old) w.r.t longer edge
+    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+    if not scaleup:  # only scale down, do not scale up (for better val mAP)
+        r = min(r, 1.0)
+
+    # Compute padding
+    ratio = r, r  # width, height ratios
+    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
+    if auto:                                # minimum padding to rectangle
+        dw, dh = dw % stride, dh % stride   # wh padding
+    elif scaleFill:                         # stretch w/o padding
+        dw, dh = 0.0, 0.0
+        new_unpad = (new_shape[1], new_shape[0])
+        ratio = new_shape[0] / shape[0], new_shape[1] / shape[1]  # rH, rW
+
+    dw /= 2  # divide padding into 2 sides
+    dh /= 2
+
+    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+    if shape[::-1] != new_unpad:  # resize
+        im = TF.resize(im, new_unpad[::-1], interpolation=TF.InterpolationMode.BILINEAR, antialias=True)
+    #logging.info(f"resized tensor img shape={tuple(im.shape)}, dtype={im.dtype}, sum={im.sum(dim=(1,2))}")
+    im = F.pad(im, mode='constant', pad=(left, right, top, bottom), value=sum(color)/len(color) if isinstance(color, tuple) else color)
+
+    return im, dict(
+        shape=shape,        # HxW
+        offset=(top, left), # offH, offW
+        ratio=ratio,        # rH, rW
+    )
+
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
     r"""Resize and pad to a multiple of strides for object detection.
 

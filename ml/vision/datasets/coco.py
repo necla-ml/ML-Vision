@@ -1,3 +1,5 @@
+import os
+from os import name
 from pathlib import Path
 from torchvision.datasets import coco
 from ... import logging
@@ -48,6 +50,8 @@ SPLITS = dict(
     test='test2017.txt'
 )
 
+BASE_DOWNLOAD_URL = lambda split: f'http://images.cocodataset.org/zips/{split}.zip'
+
 def toYOLO(root, splits=['val2017'], rewrites=None, exact=False):
     """Generate labels and splits in YOLOv5 format (xc, yc, w, h) from official annotations (x1, y1, w, h).
     """
@@ -82,7 +86,33 @@ def toYOLO(root, splits=['val2017'], rewrites=None, exact=False):
                 print(img_path, file=sf)
             logging.info(f"### Done processing {split} split at {path} ###")
 
+def download(split='val2017', reload=False):
+    """
+    Downloads COCO split
+    Returns:
+        Path to downloaded split directory
+    """
+    from io import BytesIO
+    from urllib.request import urlopen
+    from zipfile import ZipFile
+    from ml import hub
 
+    download_url = BASE_DOWNLOAD_URL(split)
+    download_dir = Path(os.path.join(hub.get_dir(), 'COCO'))
+    download_dir.mkdir(exist_ok=True, parents=True)
+    split_dir = Path(os.path.join(download_dir, f'{split}'))
+ 
+    if split_dir.exists() and any(split_dir.iterdir()) and not reload:
+        # already exists
+        logging.info(f'Skipping download of COCO: {split} as it already exists')
+        return 
+    else:
+        # download 
+        with urlopen(download_url) as zipresp:
+            with ZipFile(BytesIO(zipresp.read())) as zfile:
+                zfile.extractall(download_dir)
+        logging.info(f'Downloaded COCO: {split}')
+    return str(split_dir)
 
 class CocoDetection(coco.CocoDetection):
     def __init__(self, root, split, transforms=None, transform=None, target_transform=None):

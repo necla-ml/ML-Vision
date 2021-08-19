@@ -19,7 +19,6 @@ def batch_size():
 @pytest.fixture
 def shape():
     return 3, 384, 640
-    return 3, 640, 640
 
 @pytest.fixture
 def dev():
@@ -30,8 +29,24 @@ def args(shape, dev):
     return th.rand(1, *shape, device=dev)
 
 @pytest.fixture
-def batch(batch_size, shape, dev):
-    return th.rand(batch_size, *shape)
+def url():
+    return 'https://hbr.org/resources/images/article_assets/2015/03/MAR15_18_91531630.jpg'
+
+@pytest.fixture
+def image(url):
+    from PIL import Image
+    import requests
+    im = Image.open(requests.get(url, stream=True).raw)
+    return im
+
+@pytest.fixture
+def transform(shape):
+    import ml.vision.transforms as T 
+    return T.Compose([T.Resize(shape[1:]), T.ToTensor()])
+
+@pytest.fixture
+def batch(image, transform, batch_size, dev):
+    return th.stack([transform(image)] * batch_size)
 
 @pytest.fixture
 def tag():
@@ -92,7 +107,7 @@ def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict):
                           int8=int8,
                           strict_type_constraints=strict,
                           )
-
+    
     outputs = benchmark(engine.predict, batch[:B].to(dev), sync=True)
     # print('outputs:', [output.shape for output in outputs])
     meta_preds, features = outputs[:3], outputs[3:]
@@ -105,7 +120,7 @@ def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict):
             # print('torch:', [o.shape for o in torch_meta_preds], [feats.shape for feats in torch_features])
     logging.info(f"outputs trt norm={[preds.norm().item() for preds in meta_preds]}, torch norm={[preds.norm().item() for preds in torch_meta_preds]}")
     if fp16:
-        #th.testing.assert_allclose(torch_output, th.from_numpy(output[:B]).to(dev), rtol=1e-02, atol=3e-02)
+        # th.testing.assert_allclose(torch_output, th.from_numpy(output[:B]).to(dev), rtol=1e-02, atol=3e-02)
         pass
     else:
         for torch_preds, preds in zip(torch_meta_preds, meta_preds):
