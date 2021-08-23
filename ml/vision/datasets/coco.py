@@ -105,13 +105,13 @@ def download(split='val2017', reload=False):
     if split_dir.exists() and any(split_dir.iterdir()) and not reload:
         # already exists
         logging.info(f'Skipping download of COCO: {split} as it already exists')
-        return 
     else:
         # download 
         with urlopen(download_url) as zipresp:
             with ZipFile(BytesIO(zipresp.read())) as zfile:
                 zfile.extractall(download_dir)
         logging.info(f'Downloaded COCO: {split}')
+        
     return str(split_dir)
 
 class CocoDetection(coco.CocoDetection):

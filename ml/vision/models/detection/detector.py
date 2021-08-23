@@ -1,3 +1,4 @@
+import os
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from pathlib import Path
@@ -276,7 +277,44 @@ class YOLODetector(Detector):
         self.head = module.model[-1]
         int8 = kwargs.get('int8', False)
         strict = kwargs.get('strict', False)
-        self.engine = deploy.build(f"{name}-bs{batch_size}_{spec[-1]}x{spec[-2]}{fp16 and '_fp16' or ''}{int8 and '_int8' or ''}{strict and '_strict' or ''}",
+        if int8:
+            from ml import hub
+            from ml.vision.datasets.coco import download
+
+            def preprocessor(size=(384, 640)):
+                from PIL import Image
+                from torchvision import transforms
+                trans = transforms.Compose([transforms.Resize(size),
+                                            transforms.ToTensor()])
+
+                H, W = size
+                def preprocess(image_path, *shape):
+                    r'''Preprocessing for TensorRT calibration
+                    Args:
+                        image_path(str): path to image
+                        channels(int):
+                    '''
+                    image = Image.open(image_path)
+                    logging.debug(f"image.size={image.size}, mode={image.mode}")
+                    image = image.convert('RGB')
+                    C = len(image.mode)
+                    im = trans(image)
+                    assert im.shape == (C, H, W)
+                    return im
+
+                return preprocess
+
+            int8_calib_max = kwargs.get('int8_calib_max', 5000)
+            int8_calib_batch_size = kwargs.get('int8_calib_batch_size', max(batch_size, 64)) 
+            cache = f'{name}-COCO2017-val-{int8_calib_max}-{int8_calib_batch_size}.cache'
+            cache_path = Path(os.path.join(hub.get_dir(), cache))
+            kwargs['int8_calib_cache'] = str(cache_path)
+            kwargs['int8_calib_data'] = download(split='val2017', reload=False)
+            kwargs['int8_calib_preprocess_func'] = preprocessor()
+            kwargs['int8_calib_max'] = int8_calib_max
+            kwargs['int8_calib_batch_size'] = int8_calib_batch_size
+          
+        self.engine = deploy.build(f"{name}-bs{batch_size}_{spec[-2]}x{spec[-1]}{fp16 and '_fp16' or ''}{int8 and '_int8' or ''}{strict and '_strict' or ''}",
                                    self,
                                    [spec],
                                    backend=backend, 

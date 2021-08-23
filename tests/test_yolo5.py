@@ -27,7 +27,7 @@ def shape():
 
 @pytest.fixture
 def batch_size():
-    return 30
+    return 40
 
 @pytest.fixture
 def image(url):
