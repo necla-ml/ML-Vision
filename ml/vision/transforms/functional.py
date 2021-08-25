@@ -22,7 +22,7 @@ except Exception as e:
     accimage = None
 
 def is_tensor(img):
-    return th.is_tensor(img) and img.shape[0] in (1, 3) and img.dtype == th.uint8
+    return th.is_tensor(img) and img.dtype == th.uint8 # and img.shape[0] in (1, 3)
 
 def is_cv2(img):
     if isinstance(img, np.ndarray):
@@ -41,7 +41,7 @@ def is_pil(img):
     else:
         return isinstance(img, Image.Image)
 
-def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shorter', **kwargs):
+def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shorter', antialias=True, **kwargs):
     '''Resize input image of PIL/accimage, OpenCV BGR or torch tensor.
     Args:
         size(Tuple[int], int): tuple of height and width or length on both sides following torchvision resize semantics
@@ -94,4 +94,4 @@ def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shor
         from ml.av.backend import opencv as cv
         return cv.resize(img, (w, h), interpolation=cv.INTER_LINEAR)
     else:
-        return TF.resize(img, (h, w), interpolation, **kwargs)
+        return TF.resize(img, (h, w), interpolation, antialias=antialias, **kwargs)
