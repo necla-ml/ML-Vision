@@ -136,7 +136,7 @@ def test_deploy_trt(benchmark, batch, backbone_x101_32x8d_wsl, dev, B, fp16, int
     maxH, maxW = max_inp_size
     min_shapes = [(3, minH, minW)]
     max_shapes = [(3, maxH, maxW)]
-    spec = [(3, minH, minW)]
+    spec = [[3, minH, minW]]
     dynamic_axes={'input_0': {0: 'batch_size'}}
     if maxH != minH:
         spec[0][1] = -1
