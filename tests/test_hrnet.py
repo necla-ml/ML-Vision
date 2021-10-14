@@ -2,29 +2,20 @@
 from pathlib import Path
 import pytest
 
-from torch.cuda.amp import autocast
-import torch as th
-import numpy as np
-
-from ml import logging
-from ml.vision.models import yolo4, yolo5, yolo5l, yolo5x, rfcn
-from ml.vision.models.detection import yolo
-from ml.vision.datasets.coco import COCO80_CLASSES
-from ml.vision.ops import MultiScaleFusionRoIAlign
-from ml.vision.ops import xyxys2xyxysc, xcycwh2xyxy, xcycwh2xywh, xyxy2xcycwh
+import torch 
 
 from .fixtures import *
 
 @pytest.fixture
 def img():
-    return 'assets/bus_zidane_tiles.jpg'
+    #return 'assets/bus_zidane_tiles.jpg'
+    return '/home/ml/dpatel/Downloads/H4H/frames-1fps/2018/16-frame.jpg'
 
 # @pytest.mark.essential
 @pytest.mark.parametrize("pretrained", [True])
 @pytest.mark.parametrize("arch", ['litehrnet_30_coco_384x288'])
-def test_posenet(pretrained, arch, img):
+def test_posenet(benchmark, pretrained, arch, img):
     from ml.vision.models.pose import posenet, inference
-    print()
     model = posenet(pretrained=pretrained, arch=arch, force_reload=False, unload_after=True, fp16=False)
     # print(model.tag, model)
 
@@ -33,7 +24,7 @@ def test_posenet(pretrained, arch, img):
     detector = yolo5(pretrained=True, 
                      classes=80,
                      chkpt='yolov5x', 
-                     tag='v3.1', 
+                     tag='v5.0', 
                      s3=None, 
                      fuse=True, 
                      force_reload=False)
@@ -59,7 +50,8 @@ def test_posenet(pretrained, arch, img):
         15: 'left_ankle',
         16: 'right_ankle'
     """    
-    results, vis_img = inference(detector, model, img, vis=True)
-    # print(results)
+    results = benchmark(inference, detector, model, img)
+
     # FIXME Use ml.vision.io.save(...) instead
-    # cv.save(vis_img, f'export/{Path(img).name}')
+    # from ml.vision.io import write_jpeg
+    # write_jpeg(torch.tensor(vis_img).permute(2, 0, 1), f'test.jpg')

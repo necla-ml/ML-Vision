@@ -12,7 +12,7 @@ GITHUB = dict(
 )
 
 TAGS = {
-    'main': '893bc89',
+    'main': '4ef311b',
     'hrnet': '7b9049d',
 }
 
@@ -121,7 +121,8 @@ def posenet(pretrained=False, arch='litehrnet_30_coco_384x288', model_dir=None, 
             m = fuse_conv_bn(m)
             logging.info(f"[posenet] fused conv and bn")
     except Exception as e:
-        logging.info(f"Failed to load '{entry}': {e}")
+        logging.error(f"Failed to load '{entry}': {e}")
+        raise e
     finally:
         # XXX Remove newly imported modules in case of conflict with next load
         if unload_after:
@@ -134,10 +135,9 @@ def inference(detector, model, img, vis=False, bbox_thr=0.3, kpt_thr=0.3, datase
     import torch as th
     from ml import cv
     from ml.vision.ops import dets_select
-    from xtcocotools.coco import COCO
-    from mmpose.apis import (inference_top_down_pose_model, 
-                             init_pose_model,
-                             vis_pose_result)
+    # from xtcocotools.coco import COCO
+    from mmpose.apis import (inference_top_down_pose_model, vis_pose_result)
+    from mmpose.datasets import DatasetInfo
 
     model.to('cuda:0')
     model.eval()
@@ -147,7 +147,7 @@ def inference(detector, model, img, vis=False, bbox_thr=0.3, kpt_thr=0.3, datase
     with th.cuda.amp.autocast(enabled=fp16):
         dets = detector.detect(img, size=640, conf_thres=0.4, iou_thres=0.5)
     persons = dets_select(dets, [0])
-    ppls = [dets_f[persons_f].cpu() for dets_f, persons_f in zip(dets, persons)]
+    ppls = [dets_f[persons_f].cpu().numpy() for dets_f, persons_f in zip(dets, persons)]
 
 
     """
@@ -167,10 +167,11 @@ def inference(detector, model, img, vis=False, bbox_thr=0.3, kpt_thr=0.3, datase
             bbox_thr=bbox_thr,
             format=format,
             dataset=dataset,
+            # dataset_info=DatasetInfo({'dataset_name': dataset, 'flip_pairs': []}),
             return_heatmap=return_heatmap,
             outputs=None)
-    img = cv.imread(img)
     if vis:
+        img = cv.imread(img)
         vis_img = vis_pose_result(
                 model,
                 img,
