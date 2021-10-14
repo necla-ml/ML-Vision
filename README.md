@@ -2,12 +2,17 @@
 
 Common computer vision NNs and ops:
 - torchvision
-- mmdetection
-- Deformable RFCN
-    * `pip install git+https://github.com/necla-ml/Deformable-ConvNets-py3`
 - YOLOv5
+- DETR
+- & more
 
-# Usage
+## Installation
+
+```sh
+conda install -c necla-ml ml-vision
+```
+
+## Usage
 
 - Sample DETR inference
 ```py
