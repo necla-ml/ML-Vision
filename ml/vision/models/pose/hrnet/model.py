@@ -149,7 +149,6 @@ def inference(detector, model, img, vis=False, bbox_thr=0.3, kpt_thr=0.3, datase
     persons = dets_select(dets, [0])
     ppls = [dets_f[persons_f].cpu().numpy() for dets_f, persons_f in zip(dets, persons)]
 
-
     """
     Args:
         person_results(List[Tensor(N, 5)]): bboxes per class in order with scores

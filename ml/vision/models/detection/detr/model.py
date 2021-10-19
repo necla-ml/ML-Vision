@@ -23,7 +23,7 @@ GITHUB_DEFORMABLE_DETR = dict(
 )
 
 TAGS_DEFORMABLE_DETR = {
-    'main': '61854d0'
+    'main': '748af5a'
 }
 
 def github(tag='main', deformable=False):
