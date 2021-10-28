@@ -8,8 +8,7 @@ from .fixtures import *
 
 @pytest.fixture
 def img():
-    #return 'assets/bus_zidane_tiles.jpg'
-    return '/home/ml/dpatel/Downloads/H4H/frames-1fps/2018/16-frame.jpg'
+    return 'assets/bus.jpg'
 
 # @pytest.mark.essential
 @pytest.mark.parametrize("pretrained", [True])
@@ -51,6 +50,7 @@ def test_posenet(benchmark, pretrained, arch, img):
         16: 'right_ankle'
     """    
     results = benchmark(inference, detector, model, img)
+    # results, vis_img = inference(detector, model, img, vis=True)
 
     # FIXME Use ml.vision.io.save(...) instead
     # from ml.vision.io import write_jpeg

@@ -1,8 +1,7 @@
 import os
 import tempfile
+
 import pytest
-import torch as th
-from pathlib import Path
 from ml import logging
 from ml.av import io
 
@@ -25,7 +24,7 @@ def test_io_image(img):
 def test_io_video(vid):
     with tempfile.TemporaryDirectory() as tmp:
         path = f"{tmp}/video.mp4"
-        io.save(vid, path, fps=5)
+        io.save(vid, path, fps=1)
         size = os.path.getsize(path)
         logging.info(f"saved video to {path} of {size} bytes")
         assert size > 0
