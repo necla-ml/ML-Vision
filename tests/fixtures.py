@@ -6,11 +6,12 @@ YOLO5_TAG_SZ = {
     'v2.0':672,
     'v3.0':640,
     'v5.0':640,
+    'v6.0':640
 }
 
 @pytest.fixture
 def vid():
-    return th.randint(0, 255, (10, 1080, 810, 3), dtype=th.uint8)
+    return th.randint(0, 255, (5, 1080, 810, 3), dtype=th.uint8)
 
 @pytest.fixture
 def xyxy():
