@@ -23,10 +23,11 @@ named_arches = OrderedDict([
     ('Pascal', '6.0;6.1+PTX'),
     ('Volta', '7.0+PTX'),
     ('Turing', '7.5+PTX'),
+    ('Ampere', '8.0;8.6+PTX'),
 ])
 
 supported_arches = ['3.5', '3.7', '5.0', '5.2', '5.3', '6.0', '6.1', '6.2',
-                    '7.0', '7.2', '7.5']
+                    '7.0', '7.2', '7.5', '8.0', '8.6']
 
 valid_arch_strings = supported_arches + [s + "+PTX" for s in supported_arches]
 
@@ -46,8 +47,9 @@ valid_arch_strings = supported_arches + [s + "+PTX" for s in supported_arches]
 #   - Titan RTX,
 
 if not os.environ.get('TORCH_CUDA_ARCH_LIST'):
-    os.environ['TORCH_CUDA_ARCH_LIST'] = '5.2;6.1;7.0;7.5'
-    
+    # os.environ['TORCH_CUDA_ARCH_LIST'] = '5.2;6.1;7.0;7.5;8.0;8.6+PTX'
+    logging.warn(f'TORCH_CUDA_ARCH_LIST not set, build based on local GPU capability={torch.cuda.get_device_capability(0)}')
+
 cwd = Path(__file__).parent
 pkg = sh('basename -s .git `git config --get remote.origin.url`').lower()
 PKG = pkg.upper()
@@ -199,7 +201,7 @@ if __name__ == '__main__':
         name=name,
         version=version,
         author='Farley Lai',
-        url='https://gitlab.com/necla-ml/ML-Vision',
+        url='https://github.com/necla-ml/ML-Vision',
         description=f"NECLA ML-Vision Library",
         long_description=readme(),
         keywords='machine learning, computer vision',
