@@ -52,6 +52,13 @@ def detector(tag):
     detector.eval()
     return detector.to('cuda' if th.cuda.is_available() else 'cpu')
 
+def test_model_eval(benchmark, detector):
+    def detect(detector):
+        mode = detector.training
+        detector.eval()
+        detector.train(mode)
+    benchmark(detect, detector)
+
 @pytest.mark.essential
 @pytest.mark.parametrize("fps", [15, 20])
 @pytest.mark.parametrize("amp", [True])
