@@ -6,55 +6,31 @@ from ml.nn import functional as F
 GITHUB = dict(
     owner='ultralytics',
     project='yolov5',
-    tag='v5.0',
+    tag='v6.0',
 )
 
 TAGS = {
-    'v1.0': '5e970d4',
-    'v2.0': 'v2.0',
-    'v3.0': 'd0f98c0',
-    'v3.1': 'v3.1',
-    'v4.0': 'v4.0',
-    'v5.0': 'v5.0',     # required by pytorch=1.8+
+    'v6.0': 'v6.0'
 }
 
-class Hardswish(nn.Module):  # export-friendly version of nn.Hardswish()
-    @staticmethod
-    def forward(x):
-        # return x * F.hardsigmoid(x)  # for torchscript and CoreML
-        return x * F.hardtanh(x + 3, 0., 6.) / 6.  # for torchscript, CoreML and ONNX
+FEATURE_LAYERS = (17, 20, 23)
 
-def github(tag='v5.0'):
+def github(tag='v6.0'):
     tag = TAGS[tag]
     return hub.github(owner=GITHUB['owner'], project=GITHUB['project'], tag=tag)
 
-def forward_once(self, x, profile=False):
-    y, dt = [], []  # outputs
+def forward_once(self, x, profile=False, visualize=False):
+    """ Collect features for tracking """
+    y = []  # outputs
     for m in self.model:
         if m.f != -1:  # if not from previous layer
             x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
 
-        if profile:
-            import thop
-            o = thop.profile(m, inputs=(x,), verbose=False)[0] / 1E9 * 2  # FLOPS
-            t = torch_utils.time_synchronized()
-            for _ in range(10):
-                _ = m(x)
-            dt.append((torch_utils.time_synchronized() - t) * 100)
-            print('%10.1f%10.0f%10.1fms %-40s' % (o, m.np, dt[-1], m.type))
-
         x = m(x)  # run
         y.append(x if m.i in self.save else None)  # save output
 
-    if profile:
-        print('%.1fms total' % sum(dt))
-    if self.tag == 'v1.0':
-        self.features = [y[i] for i in (17, 21, 25)]
-    elif self.tag in ['v2.0', 'v3.0', 'v3.1', 'v4.0', 'v5.0']:
-        self.features = [y[i] for i in (17, 20, 23)]
-    else:
-        raise ValueError(f"Unsupported version: {GITHUB}")
-    # return x if self.training else x[0]
+    self.features = [y[i] for i in FEATURE_LAYERS]
+
     return x
 
 def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
@@ -64,7 +40,7 @@ def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
         key(str): path in an S3 bucket
     """
     stem, suffix = chkpt.split('.')
-    tag = kwargs.get('tag', 'v3.1') 
+    tag = kwargs.get('tag', 'v6.0') 
     s3 = kwargs.get('s3', None)
     if s3 and s3.get('bucket', None) and s3.get('key', None):
         url = f"s3://{s3['bucket']}/{s3['key']}"
@@ -85,7 +61,7 @@ def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
             m._non_persistent_buffers_set = set()
     return model.float().state_dict()
 
-def yolo5(chkpt, pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, **kwargs):
+def yolo5(chkpt, pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, autoshape=False, **kwargs):
     """
     Args:
     Kwargs:
@@ -94,25 +70,29 @@ def yolo5(chkpt, pretrained=False, channels=3, classes=80, fuse=True, model_dir=
         s3(dict): S3 source containing bucket and key to download a checkpoint from
     """
     import types
-    tag = kwargs.get('tag', 'v5.0')
+    tag = kwargs.get('tag', 'v6.0')
     modules = sys.modules.copy()
     try:
-        m = hub.load(github(tag=tag), chkpt[:len('yolov5x')], False, channels, classes, force_reload=force_reload)
+        m = hub.load(github(tag=tag), chkpt[:len('yolov5x')], False, channels, classes, force_reload=force_reload, autoshape=autoshape)
         m.tag = tag
         if pretrained:
             state_dict = from_pretrained(f'{chkpt}.pt', model_dir=model_dir, force_reload=force_reload, **kwargs)
-            state_dict = { k: v for k, v in state_dict.items() if m.state_dict()[k].shape == v.shape }
+            state_dict = { k: v for k, v in state_dict.items() if k in m.state_dict() and  m.state_dict()[k].shape == v.shape } 
             m.load_state_dict(state_dict, strict=not False)
-        for module in m.modules():
-            # XXX export friendly for ONNX/TRT
-            if isinstance(getattr(module, 'act', None), nn.Hardswish):
-                module.act = Hardswish()
-        m.forward_once = types.MethodType(forward_once, m)
-        if tag in ['v2.0', 'v3.0', 'v3.1', 'v4.0', 'v5.0']:
-            [m.save.append(layer) for layer in (17, 20, 23) if layer not in m.save]
-        elif tag == 'v1.0':
-            [m.save.append(layer) for layer in (17, 21, 25) if layer not in m.save]
+
+        # replace forward_once with our custom forward_once
+        forward_m = list(filter(lambda x: x.endswith('forward_once'), dir(m)))
+        assert forward_m, f'Cannot find forward_once method in the model'
+        setattr(m, forward_m[0], types.MethodType(forward_once, m))
+
+        # add feature layers to save list for `forward_once`
+        for layer in FEATURE_LAYERS: 
+            if layer not in m.save:
+                m.save.append(layer) 
+        # fuse if enabled
         fuse and m.fuse()
+    except Exception as e:
+        raise e
     finally:
         # XXX Remove newly imported modules in case of conflict with next load
         if unload_after:

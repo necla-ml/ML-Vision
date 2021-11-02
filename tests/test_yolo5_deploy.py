@@ -45,7 +45,7 @@ def batch(image, transform, batch_size, dev):
 
 @pytest.fixture
 def tag():
-    return 'v5.0'
+    return 'v6.0'
 
 @pytest.fixture
 def name():
@@ -149,23 +149,17 @@ def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict, name
                           **kwargs
                           )
     
-    outputs = benchmark(engine.predict, batch[:B].to(dev), sync=True)
-    # print('outputs:', [output.shape for output in outputs])
-    meta_preds, features = outputs[:3], outputs[3:]
-    assert len(outputs) == 6
-    assert len(meta_preds) == 3
+    preds, *features = benchmark(engine.predict, batch[:B].to(dev), sync=True)
     assert len(features) == 3
     with th.no_grad():
         with th.cuda.amp.autocast(enabled=fp16):
-            torch_meta_preds, torch_features = detector(batch[:B].to(dev))
-            # print('torch:', [o.shape for o in torch_meta_preds], [feats.shape for feats in torch_features])
-    logging.info(f"outputs trt norm={[preds.norm().item() for preds in meta_preds]}, torch norm={[preds.norm().item() for preds in torch_meta_preds]}")
+            torch_preds, torch_features = detector(batch[:B].to(dev))
+    logging.info(f"outputs trt norm={preds.norm().item()}, torch norm={torch_preds.norm().item()}")
     if fp16 or int8:
-        # th.testing.assert_allclose(torch_output, th.from_numpy(output[:B]).to(dev), rtol=1e-02, atol=3e-02)
         pass
+        # th.testing.assert_allclose(torch_preds.float(), preds.float(), rtol=2e-02, atol=4e-02)
     else:
-        for torch_preds, preds in zip(torch_meta_preds, meta_preds):
-            th.testing.assert_allclose(torch_preds.float(), preds.float(), rtol=1e-03, atol=4e-04)
+        th.testing.assert_allclose(torch_preds.float(), preds.float(), rtol=1e-03, atol=4e-04)
         for torch_feats, feats in zip(torch_features, features):
             th.testing.assert_allclose(torch_feats.float(), feats.float(), rtol=1e-03, atol=4e-04)
 
@@ -196,13 +190,13 @@ def test_detect_trt(benchmark, batch, detector, B, batch_preprocess, fp16, int8)
                     reload=not True)
     
     dets, pooled = benchmark(detector.detect, frames, **cfg)
-    print(dets[0].shape, dets[0].dtype, pooled[0].shape, pooled[0].dtype)
 
 # @pytest.mark.essential
 def test_detection_tv(detector, tile_img, B=5, fp16=True):
     from pathlib import Path
     from ml.av import io, utils
     from ml.av.transforms import functional as TF
+    from ml.vision.datasets.coco import COCO80_CLASSES
     path = Path(tile_img)
     img = io.load(path)
     h, w = img.shape[-2:]
