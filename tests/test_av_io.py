@@ -23,8 +23,9 @@ def test_io_image(img):
 @pytest.mark.essential
 def test_io_video(vid):
     with tempfile.TemporaryDirectory() as tmp:
+        # FIXME: fps must be 11+
         path = f"{tmp}/video.mp4"
-        io.save(vid, path, fps=1)
+        io.save(vid, path, fps=12)      
         size = os.path.getsize(path)
         logging.info(f"saved video to {path} of {size} bytes")
         assert size > 0
