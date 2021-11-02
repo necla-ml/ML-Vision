@@ -15,7 +15,7 @@ from .fixtures import *
 @pytest.fixture
 def tag():
     # YOLOv5 version tag
-    return 'v5.0'
+    return 'v6.0'
 
 @pytest.fixture
 def url():

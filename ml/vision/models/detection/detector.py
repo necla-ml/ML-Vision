@@ -250,13 +250,13 @@ class RFCNDetector(Detector):
 class YOLODetector(Detector):
     def __init__(self, model, pooling=0, **kwargs):
         super(YOLODetector, self).__init__(model, **kwargs)
-        self.engine = self.pooler = None
+        self.engine = self.pooler = self.device = None
         if pooling:
             self.pooler = MultiScaleFusionRoIAlign(isinstance(pooling, bool) and 1 or pooling)
             logging.info(f"Multi-scale pooling size={self.pooler.output_size}")
 
     def forward(self, *args, **kwargs):
-        outputs = self.module(*args, **kwargs)
+        outputs = self.module(*args, **kwargs)[0]
         features = self.module.features
         return outputs, features
 
@@ -273,8 +273,8 @@ class YOLODetector(Detector):
         """
         from ml import deploy
         module = self.module
-        module.model[-1].export = True
-        self.head = module.model[-1]
+        # avoids warning for dynamic ifs
+        module.model[-1].onnx_dynamic = True
         int8 = kwargs.get('int8', False)
         strict = kwargs.get('strict', False)
         if int8:
@@ -313,7 +313,10 @@ class YOLODetector(Detector):
             kwargs['int8_calib_preprocess_func'] = preprocessor()
             kwargs['int8_calib_max'] = int8_calib_max
             kwargs['int8_calib_batch_size'] = int8_calib_batch_size
-          
+
+        self.device = next(self.module.parameters()).device
+        # FIXME: cuda + onnx_dynamic: causes the onnx export to fail: https://github.com/ultralytics/yolov5/issues/5439
+        self.to('cpu') 
         self.engine = deploy.build(f"{name}-bs{batch_size}_{spec[-2]}x{spec[-1]}{fp16 and '_fp16' or ''}{int8 and '_int8' or ''}{strict and '_strict' or ''}",
                                    self,
                                    [spec],
@@ -323,6 +326,7 @@ class YOLODetector(Detector):
                                    fp16=fp16,
                                    strict_type_constraints=strict,
                                    **kwargs)
+        self.to(self.device)
         del self.module
 
     def detect(self, images, **kwargs):
@@ -333,12 +337,10 @@ class YOLODetector(Detector):
             detection(List[Tensor[N, 6]]): list of object detection tensors in [x1, y1, x2, y2, score, class] per image
             pooled(list[Tensor[B, 256 | 512 | 1024, GH, GW]], optional): pooled features at three different scales
         """
-        mode = self.training
-        self.eval()
-        param = next(self.parameters())
+        dev = self.device or next(self.module.parameters()).device
 
         from ml.vision.models.detection import yolo
-        mosaic = kwargs.get('mosaic', False)
+        # mosaic = kwargs.get('mosaic', False)
         batch_preprocess = kwargs.get('batch_preprocess', False)
         size = kwargs.get('size', 640)
         cfg = dict(
@@ -347,29 +349,14 @@ class YOLODetector(Detector):
             agnostic = kwargs.get('agnostic', False),
             merge = kwargs.get('merge', True),
         )
-        batch, metas = batch_preprocess and yolo.batched_preprocess(images.to(param.device), size=size) or yolo.preprocess(images, size=size)
+        batch, metas = batch_preprocess and yolo.batched_preprocess(images.to(dev), size=size) or yolo.preprocess(images, size=size)
+        batch = batch.to(dev)
         with th.no_grad():
             if self.engine is None:
-                outputs, features = self(batch.to(param.device))
-                predictions = outputs[0]
+                predictions, features = self(batch)
             else:
-                # XXX Remaining inference skipped in Detect for ONNX export
-                outputs = self.engine.predict(batch.to(param.device))
-                x, features = outputs[:3], outputs[3:]
-                z = []
-                head = self.head
-                # logging.info(f"x={[tuple(xi.shape) for xi in x]}, feats={[tuple(feats.shape) for feats in features]}")
-                for i in range(head.nl):
-                    bs, na, ny, nx, no = x[i].shape
-                    if head.grid[i].shape[2:4] != x[i].shape[2:4]:
-                        head.grid[i] = head._make_grid(nx, ny).to(x[i].device)
-                    y = x[i].sigmoid()
-                    # logging.info(f"y={tuple(y.shape)}, head.grid[{i}]={head.grid[i].shape}, head.stride[{i}]={head.stride[i].shape}")
-                    y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + head.grid[i].to(x[i].device)) * head.stride[i]  # xy
-                    y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * head.anchor_grid[i]  # wh
-                    z.append(y.view(bs, -1, head.no))
-                predictions = th.cat(z, 1)
-            # print(predictions, predictions.mean())
+                predictions, *features = self.engine.predict(batch)
+
         dets = yolo.postprocess(predictions, metas, **cfg)
         dtype = th.float32
         for dets_f in dets:
@@ -377,18 +364,13 @@ class YOLODetector(Detector):
                 dtype = dets_f.dtype
                 break
 
-        dets = list(map(lambda det: th.empty(0, 6, dtype=dtype, device=param.device) if det is None else det, dets))
+        dets = list(map(lambda det: th.empty(0, 6, dtype=dtype, device=dev) if det is None else det, dets))
         if self.pooler is None:
-            self.train(mode)
             return dets
         else:
-            #print([feats.shape for feats in features])
             with th.no_grad():
-                features = [feats.to(dets[0]) for feats in features]
+                # features = [feats.to(dets[0]) for feats in features]
                 pooled = self.pooler(features, dets, metas)
-            #print("pooled:", len(pooled), [feats.shape for feats in pooled], len(dets), [rois.shape for rois in dets])
-            #print(dets)
-            self.train(mode)
             return dets, pooled
 
 class DETRDetector(Detector):
@@ -420,7 +402,6 @@ class DETRDetector(Detector):
     def detect(self, images, **kwargs):
         """Perform object detection.       
         """
-        self.eval()
         param = next(self.parameters())
 
         from ml.vision.models.detection import detr
