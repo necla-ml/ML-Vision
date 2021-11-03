@@ -369,7 +369,7 @@ class YOLODetector(Detector):
             return dets
         else:
             with th.no_grad():
-                # features = [feats.to(dets[0]) for feats in features]
+                features = [feats.to(dets[0]) for feats in features]
                 pooled = self.pooler(features, dets, metas)
             return dets, pooled
 
