@@ -201,15 +201,16 @@ def deploy_yolo5():
     parser.add_argument('--url', help='s3://bucket/key/to/chkpt.pt')
     cfg = parser.parse_args()    
 
-    from ml.vision.models.detection.yolo5 import GITHUB
     from ml import hub
-    repo = hub.repo(GITHUB, force_reload=False)
+    from ml.hub import github
+    from ml.vision.models.detection.yolo5 import GITHUB
+    repo = hub.repo(github(**GITHUB), force_reload=False)
     chkpt = cfg.chkpt
     if chkpt is None:
         chkpt = f"{repo}/weights/best.pt"
     
     sys.add_path(repo)
-    from utils.utils import strip_optimizer
+    from utils.general import strip_optimizer
     before = os.path.getsize(chkpt)
     strip_optimizer(chkpt)
     after = os.path.getsize(chkpt)
