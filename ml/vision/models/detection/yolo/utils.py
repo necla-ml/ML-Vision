@@ -121,7 +121,7 @@ def batched_nms(predictions,
     nc -= 5
     multi_label &= nc > 1                                           # multiple labels per box if nc > 1 too
     output = [None] * B
-    
+
     for b, x in enumerate(predictions):                             # image index and inference
         x = x[x[:, 4] > conf_thres]                                 # Threshold anchors by confidence
         x = x[((x[:, 2:4] > min_wh) & (x[:, 2:4] < max_wh)).all(1)] # width/height constraints

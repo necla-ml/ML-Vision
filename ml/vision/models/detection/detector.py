@@ -250,7 +250,7 @@ class RFCNDetector(Detector):
 class YOLODetector(Detector):
     def __init__(self, model, pooling=0, **kwargs):
         super(YOLODetector, self).__init__(model, **kwargs)
-        self.engine = self.pooler = self.device = None
+        self.engine = self.pooler = None
         if pooling:
             self.pooler = MultiScaleFusionRoIAlign(isinstance(pooling, bool) and 1 or pooling)
             logging.info(f"Multi-scale pooling size={self.pooler.output_size}")
@@ -314,7 +314,7 @@ class YOLODetector(Detector):
             kwargs['int8_calib_max'] = int8_calib_max
             kwargs['int8_calib_batch_size'] = int8_calib_batch_size
 
-        self.device = next(self.module.parameters()).device
+        device = next(self.module.parameters()).device
         # FIXME: cuda + onnx_dynamic: causes the onnx export to fail: https://github.com/ultralytics/yolov5/issues/5439
         self.to('cpu') 
         self.engine = deploy.build(f"{name}-bs{batch_size}_{spec[-2]}x{spec[-1]}{fp16 and '_fp16' or ''}{int8 and '_int8' or ''}{strict and '_strict' or ''}",
@@ -326,7 +326,9 @@ class YOLODetector(Detector):
                                    fp16=fp16,
                                    strict_type_constraints=strict,
                                    **kwargs)
-        self.to(self.device)
+        self.to(device)
+        # TODO: avoid storing dummy modules to keep track of module device
+        self.dummy = module.model[-1]
         del self.module
 
     def detect(self, images, **kwargs):
@@ -337,7 +339,7 @@ class YOLODetector(Detector):
             detection(List[Tensor[N, 6]]): list of object detection tensors in [x1, y1, x2, y2, score, class] per image
             pooled(list[Tensor[B, 256 | 512 | 1024, GH, GW]], optional): pooled features at three different scales
         """
-        dev = self.device or next(self.module.parameters()).device
+        dev = next(self.parameters()).device
 
         from ml.vision.models.detection import yolo
         # mosaic = kwargs.get('mosaic', False)

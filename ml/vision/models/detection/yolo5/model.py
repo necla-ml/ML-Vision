@@ -1,7 +1,6 @@
 import sys
 import torch
-from ml import nn, hub
-from ml.nn import functional as F
+from ml import hub
 
 GITHUB = dict(
     owner='ultralytics',
@@ -54,12 +53,16 @@ def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
                                          map_location=torch.device('cpu'),
                                          file_name=f'{stem}-{tag}.{suffix}',
                                          force_reload=force_reload)
+
     model = chkpt['model']
+    from models.yolo import Detect
     for m in model.modules():
-        # XXX pytorch-1.6
-        if not hasattr(m, "_non_persistent_buffers_set"):
-            m._non_persistent_buffers_set = set()
-    return model.float().state_dict()
+        # new Detect Layer compatibility
+        if type(m) is Detect and not isinstance(m.anchor_grid, list):  
+            delattr(m, 'anchor_grid')
+            setattr(m, 'anchor_grid', [torch.zeros(1)] * m.nl)
+
+    return model.float()
 
 def yolo5(chkpt, pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, autoshape=False, **kwargs):
     """
@@ -73,12 +76,11 @@ def yolo5(chkpt, pretrained=False, channels=3, classes=80, fuse=True, model_dir=
     tag = kwargs.get('tag', 'v6.0')
     modules = sys.modules.copy()
     try:
-        m = hub.load(github(tag=tag), chkpt[:len('yolov5x')], False, channels, classes, force_reload=force_reload, autoshape=autoshape)
-        m.tag = tag
+        # XXX: makes the `model` module available from og repo for torch.load
+        m = hub.load(github(tag=tag), chkpt[:len('yolov5x')], pretrained=True, channels=channels, classes=classes, force_reload=force_reload, autoshape=autoshape)
         if pretrained:
-            state_dict = from_pretrained(f'{chkpt}.pt', model_dir=model_dir, force_reload=force_reload, **kwargs)
-            state_dict = { k: v for k, v in state_dict.items() if k in m.state_dict() and  m.state_dict()[k].shape == v.shape } 
-            m.load_state_dict(state_dict, strict=not False)
+            m = from_pretrained(f'{chkpt}.pt', model_dir=model_dir, force_reload=force_reload, **kwargs)
+            setattr(m, 'tag', tag)
 
         # replace forward_once with our custom forward_once
         forward_m = list(filter(lambda x: x.endswith('forward_once'), dir(m)))
