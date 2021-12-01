@@ -163,7 +163,7 @@ def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict, name
         for torch_feats, feats in zip(torch_features, features):
             th.testing.assert_allclose(torch_feats.float(), feats.float(), rtol=1e-03, atol=4e-04)
 
-@pytest.mark.parametrize("B", [40])
+@pytest.mark.parametrize("B", [8])
 @pytest.mark.parametrize("batch_preprocess", [True, False])
 @pytest.mark.parametrize('fp16', [True, False])
 @pytest.mark.parametrize("int8", [True, False])
