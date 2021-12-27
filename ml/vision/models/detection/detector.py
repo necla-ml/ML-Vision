@@ -275,6 +275,9 @@ class YOLODetector(Detector):
         module = self.module
         # avoids warning for dynamic ifs
         module.model[-1].onnx_dynamic = True
+        # FIXME: workaround for invalid values with different batch size in tensorrt
+        # tensorrt output is not consistent with in place operations
+        module.model[-1].inplace = False
         int8 = kwargs.get('int8', False)
         strict = kwargs.get('strict', False)
         if int8:

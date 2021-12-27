@@ -184,7 +184,7 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
     if shape[::-1] != new_unpad:  # resize
-        im = TF.resize(im, new_unpad[::-1], interpolation=TF.InterpolationMode.BILINEAR)
+        im = TF.resize(im, new_unpad[::-1], interpolation=TF.InterpolationMode.BILINEAR, antialias=True)
     if TF.is_tensor(im):
         #logging.info(f"resized tensor img shape={tuple(im.shape)}, dtype={im.dtype}, sum={im.sum(dim=(1,2))}")
         im = F.pad(im, mode='constant', pad=(left, right, top, bottom), value=sum(color)/len(color) if isinstance(color, tuple) else color)

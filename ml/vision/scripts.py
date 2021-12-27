@@ -26,9 +26,13 @@ def track_video():
     parser.add_argument('--reload', action='store_true', help='Forece to reload checkpoint')
     parser.add_argument('--det-amp', action='store_true', help='Inference in AMP')
     parser.add_argument('--det-chkpt', default='yolov5x', choices=['yolov5x', 'yolov5x_custom'], help='Checkpoint name to save locally')
+    parser.add_argument('--det-backend', default=None, choices=['trt'], help='Inference backend to use')
+    parser.add_argument('--det-trt-fp16', action='store_true',  help='TRT FP16 enabled or not')
+    parser.add_argument('--det-trt-int8', action='store_true',  help='TRT INT8 enabled or not')
     parser.add_argument('--det-chkpt-url', help='S3 URL to download checkpoint')
     parser.add_argument('--det-classes', type=int, default=80, help='Number of classes to detect by the model')
-    parser.add_argument('--det-tag', default='v3.1', help='Object detector code base git tag')
+    parser.add_argument('--det-tag', default='v6.0', help='Object detector code base git tag')
+    parser.add_argument('--det-resize', default=[720, 1280], type=int, help='Resize frame')
     parser.add_argument('--det-scales', default=640, type=int, choices=[608, 640, 672, 736], help='Size to rescale input for object detection')
     parser.add_argument('--det-cls-thres', default=0.4, type=float, help='Object class confidence threshold')
     parser.add_argument('--det-nms-thres', default=0.5, type=float, help='NMS IoU threshold')
@@ -46,9 +50,9 @@ def track_video():
     from ml.vision.models import yolo5x, yolo5
     from ml.vision.models.tracking.dsort import DSTracker
     from ml.vision.ops import dets_select
-    from torchvision.datasets.folder import default_loader as loader
     from torchvision.transforms import functional as TF
-    from ml import av, cv, hub, logging, time
+    from torchvision.io import write_jpeg, read_image
+    from ml import av, hub, logging, time
     import numpy as np
     import torch as th
     path = Path(cfg.path)
@@ -71,8 +75,7 @@ def track_video():
             for p in paths:
                 if True:
                     # Follow feature extraction to load images in accimage.Image followed by ToTensor
-                    img = loader(str(p))
-                    img = cv.fromTorch(TF.to_tensor(img))
+                    img = read_image(str(p))
                     yield img
                 else:
                     yield cv.imread(p)
@@ -100,6 +103,20 @@ def track_video():
     else:
         model = yolo5x
         detector = model(tag=cfg.det_tag, pretrained=True, classes=cfg.det_classes, fuse=True, pooling=cfg.det_pooling, force_reload=cfg.reload).to(dev)
+    
+    if cfg.det_backend in ['trt']:
+        import math
+        # XXX Deployment by batch size and minimal preprocessed shape
+        amp = cfg.det_trt_fp16
+        bs = cfg.batch_size
+        scale = cfg.det_scales
+        H, W = cfg.det_resize
+        if W > H:
+            spec = (3, 32 * math.ceil(H / W * scale / 32), scale)
+        else:
+            spec = (3, scale, 32 * math.ceil(W / H * scale / 32))
+        logging.info(f"Deploying runtime={cfg.det_backend} with batch_size={bs}, spec={spec}, fp16={amp}")
+        detector.deploy('yolov5x', batch_size=bs, spec=spec, fp16=amp, int8=cfg.det_trt_int8, backend=cfg.det_backend, reload=False)
 
     tracker = DSTracker(max_feat_dist=cfg.trk_max_feat_dist,
                         max_iou_dist=cfg.trk_max_iou_dist,
@@ -109,18 +126,37 @@ def track_video():
                         gating_kf=cfg.trk_gating_kf,
                         gating_thrd=cfg.trk_gating_thrd,
                         gating_alpha=cfg.trk_gating_alpha)
-    export = Path(f'{cfg.output}/{path.stem}-{cfg.det_chkpt}_{cfg.det_tag}_{cfg.det_scales}_{cfg.det_cls_thres}_{cfg.det_nms_thres}')
+    export = Path(f'{cfg.output}/{path.stem}-{cfg.det_chkpt}_{cfg.det_tag}_{cfg.det_scales}_{cfg.det_cls_thres}_{cfg.det_nms_thres}/rendered_frames')
     export.mkdir(parents=True, exist_ok=True)
     assert export.exists()
 
-    logging.info(f"Saving tracked video and frames to {export}")
-    media = av.open(f"{export}/{path.stem}-tracking.mp4", 'w')
+    def render_frame(frame, dets, tracks=False):
+        from torchvision.utils import draw_bounding_boxes
+        from ml.vision.utils import rgb, COLORS91
+        from ml.vision.datasets.coco import COCO80_CLASSES
+        if tracks:
+            tids, dets = list(zip(*dets))
+            dets = th.stack(dets)
+            labels = [f"[{int(c)}][{tid}]" for tid, c in zip(tids, dets[:, 5])]
+            colors = [rgb(tid, integral=True) for tid in tids]
+        else:
+            labels = [COCO80_CLASSES[i] for i in dets[:, -1].int()]
+            colors = [COLORS91[i] for i in dets[:, 5].int()]
+        # get boxes: x1, y1, x2, y2
+        boxes = dets[:, :4]
+        # draw bounding boxes
+        frame = draw_bounding_boxes(frame, boxes=boxes, labels=labels, colors=colors, fill=True, width=3, font_size=25)
+        return frame
+
+    logging.info(f"Saving tracked video and frames to {export.parent}")
+    media = av.open(f"{export.parent}/{path.stem}-tracking.mp4", 'w')
     stream = media.add_stream('h264', cfg.fps)
     stream.bit_rate = 2000000
     def track_frames(frames, start, step):
+        frames = th.stack(frames)
         # Track person only
         with th.cuda.amp.autocast(enabled=cfg.det_amp):
-            dets, features = detector.detect(frames, size=cfg.det_scales, conf_thres=cfg.det_cls_thres, iou_thres=cfg.det_nms_thres)
+            dets, features = detector.detect(frames, size=cfg.det_scales, conf_thres=cfg.det_cls_thres, iou_thres=cfg.det_nms_thres, batch_preprocess=True)
         persons = dets_select(dets, cfg.trk_cls_person)
         objs = [dets_f[~persons_f].cpu() for dets_f, persons_f in zip(dets, persons)]
         ppls = [dets_f[persons_f].cpu() for dets_f, persons_f in zip(dets, persons)]
@@ -142,21 +178,20 @@ def track_video():
 
             # Render both dets and tracks side by side
             frame_det = frames[j - start]
-            frame_trk = frame_det.copy()
-            H, W, C = frame_det.shape
+            frame_trk = frame_det.clone()
+            C, H, W = frame_det.shape
             if cfg.render_all:
-                frame_det = cv.render(frame_det, th.cat([ppls_f, objs_f]), show=False)
+                frame_det = render_frame(frame_det, th.cat([ppls_f, objs_f]), False)
             else:
-                frame_det = cv.render(frame_det, ppls_f, show=False)
-            frame_trk = cv.render(frame_trk, tracks, show=False)
-            frame = np.zeros((H, 2 * W, C), dtype=np.uint8)
-            frame[:, :W, :] = frame_det
-            frame[:, W:, :] = frame_trk
-            cv.save(frame, export / f"frame{start + (j - start) * step:03d}.jpg")
-            #cv.save(frame_det, export / f"frame_det{j:03d}.jpg")
-            #cv.save(frame_trk, export / f"frame_trk{j:03d}.jpg")
+                frame_det = render_frame(frame_det, ppls_f, False)
+            if tracks:
+                frame_trk = render_frame(frame_trk, tracks, True)
+            frame = th.zeros((C, H, 2 * W), dtype=th.uint8)
+            frame[:, :, :W] = frame_det
+            frame[:, :, W:] = frame_trk
+            write_jpeg(frame, str(export / f"frame{start + (j - start) * step:03d}.jpg"))
             if media is not None:
-                frame = av.VideoFrame.from_ndarray(frame, format='bgr24')
+                frame = av.VideoFrame.from_ndarray(frame.permute(1, 2, 0).numpy(), format='rgb24')
                 packets = stream.encode(frame)
                 media.mux(packets)
                 logging.debug(f'Encoded: {len(packets)} {packets}, {frame}')
@@ -167,14 +202,15 @@ def track_video():
     t = time.time()
     for i, frame in enumerate(v):
         if isinstance(frame, av.VideoFrame):
-            frame = cv.cvtColor(frame.to_rgb().to_ndarray(), cv.COLOR_RGB2BGR)
+            frame = th.as_tensor(np.ascontiguousarray(frame.to_rgb().to_ndarray())).permute(2, 0, 1)
+            if cfg.det_resize and cfg.det_backend in ['trt']:
+                frame = TF.resize(frame, cfg.det_resize, antialias=True)
             assert frame.data.contiguous
         if i == 0:
-            stream.height = frame.shape[0]
-            stream.width = frame.shape[1] * 2
+            stream.height = frame.shape[1]
+            stream.width = frame.shape[2] * 2
         if src is not None and i % step != 0:
             continue
-        
         frames.append(frame)
         if len(frames) < BS:
             continue
