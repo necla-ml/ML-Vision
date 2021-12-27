@@ -202,9 +202,9 @@ def track_video():
     t = time.time()
     for i, frame in enumerate(v):
         if isinstance(frame, av.VideoFrame):
-            frame = th.as_tensor(frame.to_rgb().to_ndarray()).permute(2, 0, 1)
+            frame = th.as_tensor(np.ascontiguousarray(frame.to_rgb().to_ndarray())).permute(2, 0, 1)
             if cfg.det_resize and cfg.det_backend in ['trt']:
-                frame = TF.resize(frame, cfg.det_resize)
+                frame = TF.resize(frame, cfg.det_resize, antialias=True)
             assert frame.data.contiguous
         if i == 0:
             stream.height = frame.shape[1]

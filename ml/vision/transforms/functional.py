@@ -41,7 +41,7 @@ def is_pil(img):
     else:
         return isinstance(img, Image.Image)
 
-def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shorter', antialias=True, **kwargs):
+def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shorter', antialias=False, **kwargs):
     '''Resize input image of PIL/accimage, OpenCV BGR or torch tensor.
     Args:
         size(Tuple[int], int): tuple of height and width or length on both sides following torchvision resize semantics
@@ -64,6 +64,13 @@ def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shor
             ``InterpolationMode.BILINEAR`` and ``InterpolationMode.BICUBIC`` are supported.
             For backward compatibility integer values (e.g. ``PIL.Image.NEAREST``) are still acceptable.
         constraint(str): resize by the shorter (ImageNet) or longer edge (YOLO)
+        antialias (bool, optional): antialias flag. If ``img`` is PIL Image, the flag is ignored and anti-alias
+            is always used. If ``img`` is Tensor, the flag is False by default and can be set to True for
+            ``InterpolationMode.BILINEAR`` only mode. This can help making the output for PIL images and tensors
+            closer.
+
+            .. warning::
+                There is no autodiff support for ``antialias=True`` option with input ``img`` as Tensor.
     Returns:
         PIL Image or Tensor: Resized image.
     """

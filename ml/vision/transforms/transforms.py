@@ -23,9 +23,16 @@ class Resize(th.nn.Module):
         interpolation (int, optional): Desired interpolation enum defined by `filters`_.
             Default is ``PIL.Image.BILINEAR``. If input is Tensor, only ``PIL.Image.NEAREST``, ``PIL.Image.BILINEAR``
             and ``PIL.Image.BICUBIC`` are supported.
+        antialias (bool, optional): antialias flag. If ``img`` is PIL Image, the flag is ignored and anti-alias
+            is always used. If ``img`` is Tensor, the flag is False by default and can be set to True for
+            ``InterpolationMode.BILINEAR`` only mode. This can help making the output for PIL images and tensors
+            closer.
+
+            .. warning::
+                There is no autodiff support for ``antialias=True`` option with input ``img`` as Tensor.
     """
 
-    def __init__(self, size, constraint='shorter', interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, constraint='shorter', interpolation=InterpolationMode.BILINEAR, antialias=False):
         super().__init__()
         if not isinstance(size, (int, Sequence)):
             raise TypeError("Size should be int or sequence. Got {}".format(type(size)))
@@ -34,6 +41,7 @@ class Resize(th.nn.Module):
         self.size = size
         self.constraint = constraint
         self.interpolation = interpolation
+        self.antialias = antialias
 
     def forward(self, img):
         """
@@ -42,11 +50,11 @@ class Resize(th.nn.Module):
         Returns:
             Resized image in the same input format.
         """
-        return F.resize(img, self.size, constraint=self.constraint, interpolation=self.interpolation)
+        return F.resize(img, self.size, constraint=self.constraint, interpolation=self.interpolation, antialias=self.antialias)
 
     def __repr__(self):
         interpolate_str = self.interpolation.value
-        return self.__class__.__name__ + '(size={0}, interpolation={1}), constraint={2}'.format(self.size, interpolate_str, self.constraint)
+        return self.__class__.__name__ + '(size={0}, interpolation={1}), constraint={2}, antialias={3}'.format(self.size, interpolate_str, self.constraint, self.antialias)
 
 # TODO no more cv2 dependencies
 class ToCV(th.nn.Module):
