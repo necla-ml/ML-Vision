@@ -4,8 +4,7 @@ from torch import nn
 from torchvision.ops.misc import FrozenBatchNorm2d
 from torchvision.models.resnet import _resnet
 from torchvision.models.detection.backbone_utils import BackboneWithFPN
-from torchvision.models.resnet import Bottleneck 
-from ml import logging
+from torchvision.models.resnet import Bottleneck
 
 class Backbone(nn.Module):
     r"""Select a subset of feature maps from a model to make a backbone with or without FPN.
