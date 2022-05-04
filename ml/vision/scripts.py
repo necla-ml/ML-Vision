@@ -1,5 +1,7 @@
 import os
+import json
 from pathlib import Path
+from collections import defaultdict
 from ml import argparse, logging, time, sys
 
 def track_video():
@@ -126,30 +128,40 @@ def track_video():
                         gating_kf=cfg.trk_gating_kf,
                         gating_thrd=cfg.trk_gating_thrd,
                         gating_alpha=cfg.trk_gating_alpha)
-    export = Path(f'{cfg.output}/{path.stem}-{cfg.det_chkpt}_{cfg.det_tag}_{cfg.det_scales}_{cfg.det_cls_thres}_{cfg.det_nms_thres}/rendered_frames')
-    export.mkdir(parents=True, exist_ok=True)
-    assert export.exists()
 
-    def render_frame(frame, dets, tracks=False):
+    export_path = Path(f'{cfg.output}/{path.stem}-{cfg.det_chkpt}_{cfg.det_tag}_{cfg.det_scales}_{cfg.det_cls_thres}_{cfg.det_nms_thres}')
+    # create frame path
+    export_frame = export_path / 'rendered_frames'
+    export_frame.mkdir(parents=True, exist_ok=True)
+    assert export_frame.exists()
+
+    TRACK_INFO = 'x1, y1, x2, y2, score, class, origin_x, origin_y, velocity_x, velocity_y'
+    DETECTION_INFO = 'x1, y1, x2, y2, score, class'
+    annot_dict = defaultdict(dict)
+
+    def render_frame(idx, frame, dets, tracks=False):
         from torchvision.utils import draw_bounding_boxes
         from ml.vision.utils import rgb, COLORS91
         from ml.vision.datasets.coco import COCO80_CLASSES
+        
         if tracks:
             tids, dets = list(zip(*dets))
             dets = th.stack(dets)
             labels = [f"[{int(c)}][{tid}]" for tid, c in zip(tids, dets[:, 5])]
             colors = [rgb(tid, integral=True) for tid in tids]
+            annot_dict[idx]['tracks'] = {tid: det for tid, det in zip(tids, dets.tolist())}
         else:
             labels = [COCO80_CLASSES[i] for i in dets[:, -1].int()]
             colors = [COLORS91[i] for i in dets[:, 5].int()]
+            annot_dict[idx]['detections'] = dets.tolist()
         # get boxes: x1, y1, x2, y2
         boxes = dets[:, :4]
         # draw bounding boxes
         frame = draw_bounding_boxes(frame, boxes=boxes, labels=labels, colors=colors, fill=True, width=3, font_size=25)
         return frame
 
-    logging.info(f"Saving tracked video and frames to {export.parent}")
-    media = av.open(f"{export.parent}/{path.stem}-tracking.mp4", 'w')
+    logging.info(f"Saving tracked video and frames to {export_path}")
+    media = av.open(f"{export_path}/{path.stem}-tracking.mp4", 'w')
     stream = media.add_stream('h264', cfg.fps)
     stream.bit_rate = 2000000
     def track_frames(frames, start, step):
@@ -180,16 +192,19 @@ def track_video():
             frame_det = frames[j - start]
             frame_trk = frame_det.clone()
             C, H, W = frame_det.shape
+            idx = f'{start + (j - start) * step:03d}'
             if cfg.render_all:
-                frame_det = render_frame(frame_det, th.cat([ppls_f, objs_f]), False)
+                dets = th.cat([ppls_f, objs_f])
+                frame_det = render_frame(idx, frame_det, dets, False)
             else:
-                frame_det = render_frame(frame_det, ppls_f, False)
+                frame_det = render_frame(idx, frame_det, ppls_f, False)
             if tracks:
-                frame_trk = render_frame(frame_trk, tracks, True)
+                frame_trk = render_frame(idx, frame_trk, tracks, True)
+
             frame = th.zeros((C, H, 2 * W), dtype=th.uint8)
             frame[:, :, :W] = frame_det
             frame[:, :, W:] = frame_trk
-            write_jpeg(frame, str(export / f"frame{start + (j - start) * step:03d}.jpg"))
+            write_jpeg(frame, str(export_frame / f"frame{idx}.jpg"))
             if media is not None:
                 frame = av.VideoFrame.from_ndarray(frame.permute(1, 2, 0).numpy(), format='rgb24')
                 packets = stream.encode(frame)
@@ -228,6 +243,18 @@ def track_video():
         media.close()
     if src is not None:
         src.close()
+    
+    # write annotations to file
+    annotations = {
+        'info': {
+            'track': TRACK_INFO,
+            'detection': DETECTION_INFO
+        },
+        'annotations': annot_dict
+    }
+    with open(f'{export_path}/annotations.json', 'w') as f:
+        json.dump(annotations, f, indent=4)
+    
     elapse = time.time() - t
     logging.info(f"Done tracking {path.name} in {elapse:.3f}s at {(i + 1) / step / elapse:.2f}fps")
 
