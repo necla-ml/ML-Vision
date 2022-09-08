@@ -25,14 +25,15 @@ def track_video():
 
     parser.add_argument('-b', '--batch-size', default=24, type=int, help='Batch size to perform object detection inference')
     parser.add_argument('--fps', default=5, type=int, help='Frames per second in the video')
-    parser.add_argument('--reload', action='store_true', help='Forece to reload checkpoint')
+    parser.add_argument('--reload', action='store_true', help='Force to reload checkpoint')
     parser.add_argument('--det-amp', action='store_true', help='Inference in AMP')
-    parser.add_argument('--det-chkpt', default='yolov5x', choices=['yolov5x', 'yolov5x_custom'], help='Checkpoint name to save locally')
+    parser.add_argument('--det-chkpt', default='yolov5x', choices=['yolov5x', 'yolov5x_custom', 'yolov5m'], help='Checkpoint name to save locally')
     parser.add_argument('--det-backend', default=None, choices=['trt'], help='Inference backend to use')
     parser.add_argument('--det-trt-fp16', action='store_true',  help='TRT FP16 enabled or not')
     parser.add_argument('--det-trt-int8', action='store_true',  help='TRT INT8 enabled or not')
     parser.add_argument('--det-chkpt-url', help='S3 URL to download checkpoint')
     parser.add_argument('--det-classes', type=int, default=80, help='Number of classes to detect by the model')
+    parser.add_argument('--det-dataset', type=str, default='coco', choices=['coco', 'object365'], help='Name of the pretrained model dataset')
     parser.add_argument('--det-tag', default='v6.0', help='Object detector code base git tag')
     parser.add_argument('--det-resize', default=[720, 1280], type=int, help='Resize frame')
     parser.add_argument('--det-scales', default=640, type=int, choices=[608, 640, 672, 736], help='Size to rescale input for object detection')
@@ -84,6 +85,7 @@ def track_video():
         v = framer()
         logging.info(f"Tracking {len(paths)} frames@{cfg.fps}fps in {path}")
     
+    # setup model
     dev = th.cuda.default_stream().device if th.cuda.is_available() else 'cpu'
     if cfg.det_chkpt_url:
         model = yolo5
@@ -120,6 +122,7 @@ def track_video():
         logging.info(f"Deploying runtime={cfg.det_backend} with batch_size={bs}, spec={spec}, fp16={amp}")
         detector.deploy('yolov5x', batch_size=bs, spec=spec, fp16=amp, int8=cfg.det_trt_int8, backend=cfg.det_backend, reload=False)
 
+    # setup tracker
     tracker = DSTracker(max_feat_dist=cfg.trk_max_feat_dist,
                         max_iou_dist=cfg.trk_max_iou_dist,
                         max_age=cfg.fps * 2,
@@ -139,11 +142,23 @@ def track_video():
     DETECTION_INFO = 'x1, y1, x2, y2, score, class'
     annot_dict = defaultdict(dict)
 
+    # setup dataset classes and colors
+    from ml.vision.utils import COLORS
+    from ml.vision.datasets.coco import COCO80_CLASSES
+    from ml.vision.datasets.object365 import OBJECT365_CLASSES
+    DATASETS = {
+        'coco': COCO80_CLASSES,
+        'object365': OBJECT365_CLASSES
+    }
+    assert cfg.det_dataset in DATASETS
+    DATASET = DATASETS[cfg.det_dataset] 
+    COLOR = COLORS(len(DATASET))
+    logging.info(f'DATASET={DATASET} with NUM_CLASSES={cfg.det_classe}')
+
     def render_frame(idx, frame, dets, tracks=False):
+        from ml.vision.utils import rgb
         from torchvision.utils import draw_bounding_boxes
-        from ml.vision.utils import rgb, COLORS91
-        from ml.vision.datasets.coco import COCO80_CLASSES
-        
+
         if tracks:
             tids, dets = list(zip(*dets))
             dets = th.stack(dets)
@@ -151,8 +166,8 @@ def track_video():
             colors = [rgb(tid, integral=True) for tid in tids]
             annot_dict[idx]['tracks'] = {tid: det for tid, det in zip(tids, dets.tolist())}
         else:
-            labels = [COCO80_CLASSES[i] for i in dets[:, -1].int()]
-            colors = [COLORS91[i] for i in dets[:, 5].int()]
+            labels = [DATASET[i] for i in dets[:, -1].int()]
+            colors = [COLOR[i] for i in dets[:, 5].int()]
             annot_dict[idx]['detections'] = dets.tolist()
         # get boxes: x1, y1, x2, y2
         boxes = dets[:, :4]
@@ -178,8 +193,10 @@ def track_video():
             assert objs_f.shape[1] == 4 + 1 + 1
             assert ppls_f.shape[1] == 4 + 1 + 1
             assert len(ppls) == len(ppl_feats)
+      
             # assert ppl_feats.shape[1] == 256 + 512 + 1024
-            assert ppl_feats_f.shape[1] == 320 + 640 + 1280
+            # assert ppl_feats_f.shape[1] == 320 + 640 + 1280
+
             matches = tracker.update(ppls_f, ppl_feats_f.view(len(ppl_feats_f), np.prod(ppl_feats_f.shape[1:])))
             snapshot = tracker.snapshot()
             tracks = []

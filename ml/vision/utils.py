@@ -26,6 +26,7 @@ WHITE    = (255, 255, 255)
 FG       = GREEN
 BG       = BLACK
 COLORS91 = [tuple(random.randint(0, 255) for _ in range(3)) for _ in range(91)]
+COLORS = lambda n_classes: [tuple(random.randint(0, 255) for _ in range(3)) for _ in range(n_classes)]
 
 PALETTE_RGB = [
     (204,73,196),

@@ -43,6 +43,12 @@ def yolo5(chkpt, pretrained=False, channels=3, pooling=False, fuse=True, model_d
     m = yolo5(chkpt, pretrained, channels=channels, classes=classes, fuse=fuse, model_dir=model_dir, force_reload=force_reload, **kwargs)
     return YOLODetector(m, pooling=pooling, classes=classes)
 
+def yolo5m(pretrained=False, channels=3, pooling=False, fuse=True, model_dir=None, force_reload=False, **kwargs):
+    from .yolo5 import yolo5m
+    classes = kwargs.pop('classes', len(coco.COCO80_CLASSES))
+    m = yolo5m(pretrained, channels=channels, classes=classes, fuse=fuse, model_dir=model_dir, force_reload=force_reload, **kwargs)
+    return YOLODetector(m, pooling=pooling)
+
 def yolo5l(pretrained=False, channels=3, pooling=False, fuse=True, model_dir=None, force_reload=False, **kwargs):
     from .yolo5 import yolo5l
     classes = kwargs.pop('classes', len(coco.COCO80_CLASSES))
