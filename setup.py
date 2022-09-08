@@ -47,8 +47,9 @@ valid_arch_strings = supported_arches + [s + "+PTX" for s in supported_arches]
 #   - Titan RTX,
 
 if not os.environ.get('TORCH_CUDA_ARCH_LIST'):
-    # os.environ['TORCH_CUDA_ARCH_LIST'] = '5.2;6.1;7.0;7.5;8.0;8.6+PTX'
-    logging.warn(f'TORCH_CUDA_ARCH_LIST not set, build based on local GPU capability={torch.cuda.get_device_capability(0)}')
+    os.environ['TORCH_CUDA_ARCH_LIST'] = ';'.join(valid_arch_strings)
+    logging.warn(f'TORCH_CUDA_ARCH_LIST not set, build based on all valid arch: {os.environ["TORCH_CUDA_ARCH_LIST"]}')
+    
 
 cwd = Path(__file__).parent
 pkg = sh('basename -s .git `git config --get remote.origin.url`').lower()

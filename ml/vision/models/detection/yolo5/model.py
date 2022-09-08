@@ -47,7 +47,7 @@ def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
         # GitHub Release
         url = hub.github_release_url('ultralytics', 'yolov5', tag, chkpt)
 
-    # logging.info(f"Loading chkpt from url={url} to filename={stem}-{tag}.{suffix}, s3={s3}")
+    print(f"Loading chkpt from url={url} to filename={stem}-{tag}.{suffix}, s3={s3}")
     chkpt = hub.load_state_dict_from_url(url, 
                                          model_dir=model_dir, 
                                          map_location=torch.device('cpu'),
@@ -101,6 +101,9 @@ def yolo5(chkpt, pretrained=False, channels=3, classes=80, fuse=True, model_dir=
             for module in sys.modules.keys() - modules.keys():
                 del sys.modules[module]
     return m
+
+def yolo5m(pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, **kwargs):
+    return yolo5('yolov5m', pretrained, channels, classes, fuse, model_dir, force_reload, unload_after, **kwargs)
 
 def yolo5l(pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, **kwargs):
     return yolo5('yolov5l', pretrained, channels, classes, fuse, model_dir, force_reload, unload_after, **kwargs)
