@@ -1,0 +1,1 @@
+from .model import GITHUB, yolo7, yolo7t, yolo7s, yolo7x

@@ -10,7 +10,7 @@ from .fixtures import *
 
 @pytest.fixture
 def batch_size():
-    return 40
+    return 16
 
 @pytest.fixture
 def shape():
@@ -60,10 +60,8 @@ def detector(tag, dev):
     return detector.to(dev)
 
 @pytest.mark.parametrize("B", [1])
-def test_deploy_onnx(benchmark, batch, detector, dev, B):
-    module = detector.module
-    module.model[-1].export = True
-    engine = deploy.build('yolo5x',
+def test_deploy_onnx(benchmark, name, batch, detector, dev, B):
+    engine = deploy.build(name,
                           detector,
                           [batch.shape[1:]],
                           backend='onnx', 
@@ -92,9 +90,6 @@ def test_deploy_onnx(benchmark, batch, detector, dev, B):
 @pytest.mark.parametrize("int8", [True, False])
 @pytest.mark.parametrize("strict", [True, False])
 def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict, name):
-    # FIXME pytorch cuda initialization must be ahead of pycuda
-    module = detector.module
-    module.model[-1].export = True
     batch = TF.resize(batch, (384, 640)).float()
     h, w = batch.shape[2:]
     kwargs = {}
@@ -137,7 +132,7 @@ def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict, name
         kwargs['int8_calib_max'] = int8_calib_max
         kwargs['int8_calib_batch_size'] = int8_calib_batch_size
 
-    engine = deploy.build(f"yolo5x-bs{B}_{h}x{w}{fp16 and '_fp16' or ''}{int8 and '_int8' or ''}",
+    engine = deploy.build(f"{name}-bs{B}_{h}x{w}{fp16 and '_fp16' or ''}{int8 and '_int8' or ''}",
                           detector,
                           [batch.shape[1:]],
                           backend='trt', 
@@ -167,7 +162,7 @@ def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict, name
 @pytest.mark.parametrize("batch_preprocess", [True, False])
 @pytest.mark.parametrize('fp16', [True, False])
 @pytest.mark.parametrize("int8", [True, False])
-def test_detect_trt(benchmark, batch, detector, B, batch_preprocess, fp16, int8):
+def test_detect_trt(benchmark, name, batch, detector, B, batch_preprocess, fp16, int8):
     if batch_preprocess:
         frames = batch[:B]
     else:
@@ -181,7 +176,7 @@ def test_detect_trt(benchmark, batch, detector, B, batch_preprocess, fp16, int8)
         batch_preprocess = batch_preprocess
     )
     spec = [3, 384, 640]
-    detector.deploy('yolo5x',
+    detector.deploy(name,
                     batch_size=B,
                     spec=spec,
                     fp16=fp16,
@@ -192,7 +187,7 @@ def test_detect_trt(benchmark, batch, detector, B, batch_preprocess, fp16, int8)
     dets, pooled = benchmark(detector.detect, frames, **cfg)
 
 # @pytest.mark.essential
-def test_detection_tv(detector, tile_img, B=5, fp16=True):
+def test_detection_tv(detector, name, tile_img, B=5, fp16=True):
     from pathlib import Path
     from ml.av import io, utils
     from ml.av.transforms import functional as TF
@@ -202,7 +197,6 @@ def test_detection_tv(detector, tile_img, B=5, fp16=True):
     h, w = img.shape[-2:]
     
     module = detector.module
-    module.model[-1].export = True
     """
     engine = deploy.build(f"yolo5x-bs{B}_{h}x{w}{fp16 and '_fp16' or ''}{int8 and '_int8' or ''}",
                           detector,
@@ -222,7 +216,7 @@ def test_detection_tv(detector, tile_img, B=5, fp16=True):
     else:
         spec = (3, scale, 32 * math.ceil(w / h * scale / 32))
     print(f"spec={spec}") 
-    detector.deploy('yolo5x', 
+    detector.deploy(name, 
                     batch_size=B, 
                     spec=spec, 
                     fp16=fp16, 
