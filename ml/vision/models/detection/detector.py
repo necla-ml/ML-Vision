@@ -78,6 +78,7 @@ def yolo7(chkpt, pretrained=False, channels=3, pooling=False, fuse=True, model_d
     classes = kwargs.pop('classes', len(coco.COCO80_CLASSES))
     m = yolo7(chkpt, pretrained, channels=channels, classes=classes, fuse=fuse, model_dir=model_dir, force_reload=force_reload, **kwargs)
     return YOLODetector(m, pooling=pooling, classes=classes)
+    
 def yolo7t(pretrained=False, channels=3, pooling=False, fuse=True, model_dir=None, force_reload=False, **kwargs):
     from .yolo7 import yolo7t
     classes = kwargs.pop('classes', len(coco.COCO80_CLASSES))
