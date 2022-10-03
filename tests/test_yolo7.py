@@ -2,20 +2,15 @@ import pytest
 
 from torch.cuda.amp import autocast
 import torch as th
-import numpy as np
 
-from ml.vision.models import yolo4, yolo5, yolo5l, yolo5x, rfcn
+from ml.vision.models import yolo7x
 from ml.vision.models.detection import yolo
-from ml.vision.datasets.coco import COCO80_CLASSES
-from ml.vision.ops import MultiScaleFusionRoIAlign
-from ml.vision.ops import xyxys2xyxysc, xcycwh2xyxy, xcycwh2xywh, xyxy2xcycwh
 
 from .fixtures import *
 
 @pytest.fixture
 def tag():
-    # YOLOv5 version tag
-    return 'v6.0'
+    return 'main'
 
 @pytest.fixture
 def url():
@@ -47,8 +42,7 @@ def batch(image, transform, batch_size):
 
 @pytest.fixture
 def detector(tag):
-    detector = yolo5x(pretrained=True, tag=tag, pooling=1, fuse=True, force_reload=False, unload_after=True)
-    assert detector.tag == tag
+    detector = yolo7x(pretrained=True, tag=tag, pooling=1, fuse=True, force_reload=False, unload_after=True)
     detector.eval()
     return detector.to('cuda' if th.cuda.is_available() else 'cpu')
 
@@ -211,112 +205,3 @@ def test_model_pooling(benchmark, detector, fps, amp):
             features = [feats.to(dets[0]) for feats in model.features]
             pooled = benchmark(detector.pooler, features, dets, metas)
 
-
-"""
-def test_torchjit(tile_img):
-    # TODO 
-    import torch
-    import torchvision
-    # An instance of your model.
-    model = torchvision.models.resnet18()
-
-    logging.info(f"Compiling pretrained detection model")
-    sm = torch.jit.script(model)
-    logging.info(f"Compiled pretrained detection model")
-    
-    '''
-    path = Path(path)
-    img = cv.imread(path)
-    img2 = cv.resize(img, scale=0.5)
-    model_dir = None # "/tmp/ml/checkpoints"
-    detector = yolo5x(pretrained=True, pooling=True, fuse=True, model_dir=model_dir, force_reload=not True)
-    
-    # dets, pooled = detector.detect([img, img2], size=640, conf_thres=0.4, iou_thres=0.5)
-    dets, pooled = detector.detect([img, img2], size=736, conf_thres=0.35, iou_thres=0.5)
-    dets, pooled = detector.detect([img, img2], size=736, conf_thres=0.001, iou_thres=0.65)
-    features = detector.features
-    print('images:', [(tuple(img.shape), img.mean()) for img in [img, img2]], 
-            'dets:', [tuple(det.shape) for det in dets], 
-            'pooled:', [tuple(feats.shape) for feats in pooled],
-            'features:', [tuple(feats.shape) for feats in features])
-    assert len(dets) == 2
-    assert dets[0].shape[1] == 4+1+1
-    cv.render(img, dets[0], score_thr=0.35, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}-yolo5.jpg")
-    cv.render(img2, dets[1], score_thr=0.35, classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}2-yolo5.jpg")
-    '''
-
-# FIXME: not maintained since YOLOv5, to remove
-def test_yolo4(tile_img):
-    from ml import cv
-    path = tile_img
-    path = Path(path)
-    img = cv.imread(path)
-    img2 = cv.resize(img, scale=0.5)
-    detector = yolo4(pooling=True, fuse=True)
-    (dets, pooled), features = detector.detect([img, img2], size=608), detector.features
-    print('images:', [(tuple(img.shape), img.mean()) for img in [img, img2]], 
-            'dets:', [tuple(det.shape) for det in dets], 
-            'pooled:', [tuple(feats.shape) for feats in pooled],
-            'features:', [tuple(feats.shape) for feats in features])
-    assert len(dets) == 2
-    assert dets[0].shape[1] == 4+1+1
-    detector.render(img, dets[0], classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}-yolo4.jpg")
-    detector.render(img2, dets[1], classes=COCO80_CLASSES, path=f"export/{path.name[:-4]}2-yolo4.jpg")
-
-@pytest.mark.essential
-def test_detection_tv(detector, tile_img):
-    from ml.av import io, utils
-    from ml.av.transforms import functional as TF
-    path = Path(tile_img)
-    img = io.load(path)
-    h, w = img.shape[-2:]
-    img2 = TF.resize(img, (h//2, w//2))
-    # print(detector)
-    
-    dets, pooled = detector.detect([img, img2], size=YOLO5_TAG_SZ[detector.tag], cls_thres=0.49, nms_thres=0.5)
-    # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.35, nms_thres=0.5)
-    # dets, pooled = detector.detect([img, img2], size=sz, cls_thres=0.01, nms_thres=0.65)
-    features = detector.features
-    '''
-    print('images:', [(tuple(img.shape), img.mean()) for img in [img, img2]], 
-            'dets:', [tuple(det.shape) for det in dets], 
-            'pooled:', [tuple(feats.shape) for feats in pooled],
-            'features:', [tuple(feats.shape) for feats in features])
-    print(dets)
-    '''
-    assert len(dets) == 2
-    assert dets[0].shape[1] == 4+1+1
-
-    dets0, dets1 = dets[0], dets[1]
-    labels0 = [f"{COCO80_CLASSES[int(c)]} {s:.2f}" for s, c in dets0[:, -2:]]
-    labels1 = [f"{COCO80_CLASSES[int(c)]} {s:.2f}" for s, c in dets1[:, -2:]]
-    print(f"lables0: {labels0}")
-    print(f"lables1: {labels1}")
-    img = utils.draw_bounding_boxes(img, dets0, labels=COCO80_CLASSES)
-    img2 = utils.draw_bounding_boxes(img2, dets1, labels=COCO80_CLASSES)
-    io.save(img, f"export/{path.name[:-4]}-yolo5.png")
-    io.save(img2, f"export/{path.name[:-4]}2-yolo5.png")
-
-def test_yolo5_store(sku_img, wp_img):
-    from ml.vision.datasets.widerperson import WIDERPERSON_CLASSES
-    WIDERPERSON_CLASSES[0] = 'object'
-    sku_img, wp_img = Path(sku_img), Path(wp_img)
-    img = cv.imread(sku_img)
-    img2 = cv.imread(wp_img)
-    model_dir = None # "/tmp/ml/checkpoints"
-    detector = yolo5(name='yolov5x-store', pretrained=True, bucket='eigen-pretrained', key='detection/yolo/yolov5x-store.pt',
-                    classes=len(WIDERPERSON_CLASSES), pooling=True, fuse=True, model_dir=model_dir, force_reload=not True)
-    # dets, pooled = detector.detect([img, img2], size=640, conf_thres=0.4, iou_thres=0.5)
-    dets, pooled = detector.detect([img, img2], size=736, conf_thres=0.35, iou_thres=0.5)
-    # dets, pooled = detector.detect([img, img2], size=736, conf_thres=0.001, iou_thres=0.65)
-    features = detector.features
-    print('images:', [(tuple(img.shape), img.mean()) for img in [img, img2]], 
-            'dets:', [tuple(det.shape) for det in dets], 
-            'pooled:', [tuple(feats.shape) for feats in pooled],
-            'features:', [tuple(feats.shape) for feats in features])
-    assert len(dets) == 2
-    assert dets[0].shape[1] == 4+1+1
-    cv.render(img, dets[0], score_thr=0.35, classes=WIDERPERSON_CLASSES, path=f"export/{sku_img.name[:-4]}-yolo5.jpg")
-    cv.render(img2, dets[1], score_thr=0.35, classes=WIDERPERSON_CLASSES, path=f"export/{wp_img.name[:-4]}2-yolo5.jpg")
-
-"""

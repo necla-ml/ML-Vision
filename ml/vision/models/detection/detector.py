@@ -97,6 +97,30 @@ def yolo7x(pretrained=False, channels=3, pooling=False, fuse=True, model_dir=Non
     m = yolo7x(pretrained, channels=channels, classes=classes, fuse=fuse, model_dir=model_dir, force_reload=force_reload, **kwargs)
     return YOLODetector(m, pooling=pooling)
 
+def yolo7w6(pretrained=False, channels=3, pooling=False, fuse=True, model_dir=None, force_reload=False, **kwargs):
+    from .yolo7 import yolo7w6
+    classes = kwargs.pop('classes', len(coco.COCO80_CLASSES))
+    m = yolo7w6(pretrained, channels=channels, classes=classes, fuse=fuse, model_dir=model_dir, force_reload=force_reload, **kwargs)
+    return YOLODetector(m, pooling=pooling)
+
+def yolo7e6(pretrained=False, channels=3, pooling=False, fuse=True, model_dir=None, force_reload=False, **kwargs):
+    from .yolo7 import yolo7e6
+    classes = kwargs.pop('classes', len(coco.COCO80_CLASSES))
+    m = yolo7e6(pretrained, channels=channels, classes=classes, fuse=fuse, model_dir=model_dir, force_reload=force_reload, **kwargs)
+    return YOLODetector(m, pooling=pooling)
+
+def yolo7d6(pretrained=False, channels=3, pooling=False, fuse=True, model_dir=None, force_reload=False, **kwargs):
+    from .yolo7 import yolo7d6
+    classes = kwargs.pop('classes', len(coco.COCO80_CLASSES))
+    m = yolo7d6(pretrained, channels=channels, classes=classes, fuse=fuse, model_dir=model_dir, force_reload=force_reload, **kwargs)
+    return YOLODetector(m, pooling=pooling)
+
+def yolo7e6e(pretrained=False, channels=3, pooling=False, fuse=True, model_dir=None, force_reload=False, **kwargs):
+    from .yolo7 import yolo7e6e
+    classes = kwargs.pop('classes', len(coco.COCO80_CLASSES))
+    m = yolo7e6e(pretrained, channels=channels, classes=classes, fuse=fuse, model_dir=model_dir, force_reload=force_reload, **kwargs)
+    return YOLODetector(m, pooling=pooling)
+
 """
 DETR
 """

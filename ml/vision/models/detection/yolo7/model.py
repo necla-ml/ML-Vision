@@ -17,7 +17,11 @@ TAGS = {
 FEATURE_LAYERS = {
     'yolov7-tiny': (57, 65, 73),
     'yolov7': (75, 88, 101),
-    'yolov7x': (87, 102, 117)
+    'yolov7x': (87, 102, 117),
+    'yolov7-w6': (93, 103, 113),
+    'yolov7-e6': (111, 123, 135),
+    'yolov7-d6': (129, 143, 157),
+    'yolov7-e6e': (210, 233, 256),
 }
 
 def github(tag='main'):
@@ -54,7 +58,7 @@ def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
         # NOTE: checkpoints assets only available in released version
         # but v0.1 release is not TRT compatible so using main: 55b90e111984dd85e7eed327e9ff271222aa8b82 
         # as the default 
-        url = hub.github_release_url('WongKinYiu', 'yolov7', 'v0.1', chkpt)
+        url = hub.github_release_url(GITHUB['owner'], GITHUB['project'], 'v0.1', chkpt)
 
     print(f"Loading chkpt from url={url} to filename={stem}.{suffix}, s3={s3}")
     chkpt = hub.load_state_dict_from_url(url, 
@@ -75,7 +79,7 @@ def yolo7(chkpt, pretrained=False, channels=3, classes=80, fuse=True, model_dir=
         s3(dict): S3 source containing bucket and key to download a checkpoint from
     """
     import types
-    tag = kwargs.get('tag', 'v0.1')
+    tag = kwargs.get('tag', 'main')
     modules = sys.modules.copy()
     try:
         # XXX: makes the `model` module available from og repo for torch.load
@@ -113,3 +117,15 @@ def yolo7s(pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, 
 
 def yolo7x(pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, **kwargs):
     return yolo7('yolov7x', pretrained, channels, classes, fuse, model_dir, force_reload, unload_after, **kwargs)
+
+def yolo7w6(pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, **kwargs):
+    return yolo7('yolov7-w6', pretrained, channels, classes, fuse, model_dir, force_reload, unload_after, **kwargs)
+
+def yolo7e6(pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, **kwargs):
+    return yolo7('yolov7-e6', pretrained, channels, classes, fuse, model_dir, force_reload, unload_after, **kwargs)
+
+def yolo7d6(pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, **kwargs):
+    return yolo7('yolov7-d6', pretrained, channels, classes, fuse, model_dir, force_reload, unload_after, **kwargs)
+
+def yolo7e6e(pretrained=False, channels=3, classes=80, fuse=True, model_dir=None, force_reload=False, unload_after=False, **kwargs):
+    return yolo7('yolov7-e6e', pretrained, channels, classes, fuse, model_dir, force_reload, unload_after, **kwargs)
