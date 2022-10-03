@@ -47,7 +47,7 @@ def parse(cfg):
     assert not u, f"Unsupported fields {u} in {cfg}. See https://github.com/ultralytics/yolov3/issues/631"
     return mdefs
 
-def preprocess(image, size=640, **kwargs):
+def preprocess(image, size=640, stride=32, **kwargs):
     """Sequential preprocessing of input images for YOLO
     Args:
         image(str | list[str] | ndarray | list[ndarray] | list[Tensors]): 
@@ -73,19 +73,19 @@ def preprocess(image, size=640, **kwargs):
     # resize w/ optional padding to a mulitple of 32
     if TF.is_tensor(images[0]):
         for img in images:
-            img, meta = letterbox(img, new_shape=size, auto=minimal)
+            img, meta = letterbox(img, new_shape=size, auto=minimal, stride=stride)
             resized.append(img)
             metas.append(meta)
     else:
         for img in images:
-            img, meta = letterbox(img, new_shape=size, auto=minimal)
+            img, meta = letterbox(img, new_shape=size, auto=minimal, stride=stride)
             resized.append(torch.from_numpy(img).flip(-1).permute(2, 0, 1))
             metas.append(meta)
     
     resized = torch.stack(resized).to(dtype=torch.get_default_dtype()).div(255)
     return resized, metas
 
-def batched_preprocess(images, size=640, **kwargs):
+def batched_preprocess(images, size=640, stride=32, **kwargs):
     """Batch preprocessing of input images of same shapes for YOLO
     Args:
         images(Tensor[BCHW]):
@@ -93,7 +93,7 @@ def batched_preprocess(images, size=640, **kwargs):
         images(Tensor[BCHW]):
     """
     # resize w/ optional padding to a mulitple of 32
-    resized, meta = batched_letterbox(images, new_shape=size, auto=True)
+    resized, meta = batched_letterbox(images, new_shape=size, auto=True, stride=stride)
     metas = [meta] * len(images)
     
     resized = resized.to(dtype=torch.get_default_dtype()).div(255)

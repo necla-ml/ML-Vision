@@ -320,6 +320,7 @@ class YOLODetector(Detector):
     def __init__(self, model, pooling=0, **kwargs):
         super(YOLODetector, self).__init__(model, **kwargs)
         self.engine = self.pooler = None
+        self.stride = int(model.stride.max())
         if pooling:
             self.pooler = MultiScaleFusionRoIAlign(isinstance(pooling, bool) and 1 or pooling)
             logging.info(f"Multi-scale pooling size={self.pooler.output_size}")
@@ -417,13 +418,14 @@ class YOLODetector(Detector):
         # mosaic = kwargs.get('mosaic', False)
         batch_preprocess = kwargs.get('batch_preprocess', False)
         size = kwargs.get('size', 640)
+        stride = kwargs.get('stride', self.stride)
         cfg = dict(
             conf_thres = kwargs.get('cls_thres', 0.4),
             iou_thres = kwargs.get('nms_thres', 0.5),
             agnostic = kwargs.get('agnostic', False),
             merge = kwargs.get('merge', True),
         )
-        batch, metas = batch_preprocess and yolo.batched_preprocess(images.to(dev), size=size) or yolo.preprocess(images, size=size)
+        batch, metas = batch_preprocess and yolo.batched_preprocess(images.to(dev), size=size, stride=stride) or yolo.preprocess(images, size=size, stride=stride)
         batch = batch.to(dev)
         with th.no_grad():
             if self.engine is None:
