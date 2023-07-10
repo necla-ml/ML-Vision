@@ -1,6 +1,4 @@
 from torchvision.ops import *
-from .roi_align import *
-from .roi_pool import *
 from .boxes import *
 from .pooler import *
 from .utils import *
@@ -22,9 +20,5 @@ __all__ = [
     'nms',
     'roi_align',
     'roi_pool',
-    'roi_pool_pth',
-    'roi_pool_ma',
-    'RoIPool',
-    'RoIPoolMa',
     'MultiScaleFusionRoIAlign',
 ]

@@ -191,11 +191,11 @@ if __name__ == '__main__':
     packages = find_namespace_packages(include=['ml.*'], exclude=('ml.csrc', 'ml.csrc.*'))
     version = write_version_py(pkg.replace('-', '/'))
 
-    cmdclass = dict(
-        build_ext=torch.utils.cpp_extension.BuildExtension,
-        clean=Clean,
-    )
-    extensions = [ext for ext in ext_modules(pkg.split('-')[0])]
+    # cmdclass = dict(
+    #     build_ext=torch.utils.cpp_extension.BuildExtension,
+    #     clean=Clean,
+    # )
+    # extensions = [ext for ext in ext_modules(pkg.split('-')[0])]
     name = sh('basename -s .git `git config --get remote.origin.url`').upper()
     logging.info(f"Building ml.vision with TORCH_CUDA_ARCH_LIST={os.environ['TORCH_CUDA_ARCH_LIST']}")
     setup(
@@ -214,7 +214,7 @@ if __name__ == '__main__':
             'Intended Audience :: Developers',
             'Intended Audience :: Education',
             'Intended Audience :: Science/Research',
-            'Programming Language :: Python :: 3.7',
+            'Programming Language :: Python :: 3.9',
             'Topic :: Scientific/Engineering',
             'Topic :: Scientific/Engineering :: Mathematics',
             'Topic :: Scientific/Engineering :: Artificial Intelligence',
@@ -225,8 +225,8 @@ if __name__ == '__main__':
         namespace_packages=namespaces,
         packages=namespaces + packages,
         install_requires=['ml'],
-        ext_modules=extensions,
-        cmdclass=cmdclass,
+        # ext_modules=extensions,
+        # cmdclass=cmdclass,
         entry_points=dict(
             console_scripts=[
                 'mlv=ml.vision.cli.main:launch',

@@ -4,6 +4,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 import torchvision.transforms as T
+from torchvision.ops import roi_align
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, TwoMLPHead
 from torchvision.models.detection import maskrcnn_resnet50_fpn
 
@@ -11,7 +12,7 @@ import torch as th
 import numpy as np
 
 from .... import nn, random, logging
-from ...ops import MultiScaleFusionRoIAlign, roi_align
+from ...ops import MultiScaleFusionRoIAlign
 from ...datasets import coco
 
 COLORS91 = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(coco.COCO91_CLASSES))]
@@ -303,7 +304,7 @@ class RFCNDetector(Detector):
                 w /= ratio
                 spatial_scale = (fw / w.item(), fh / h.item())
                 dev = th.cuda.default_stream().device if th.cuda.is_available() else 'cpu'
-                aligned = roi_align(features.to(dev), [d[:, :4].to(dev) for d in dets], output_size=(self.pooling, self.pooling), spatial_scale=spatial_scale)
+                aligned = roi_align(features.to(dev), [d[:, :4].to(dev) for d in dets], output_size=(self.pooling, self.pooling), spatial_scale=spatial_scale, aligned=True)
                 aligned = aligned.cpu()
             offset = 0
             alignedL = []
