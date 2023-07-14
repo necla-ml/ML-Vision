@@ -2,6 +2,7 @@
 
 import os
 import sys
+import glob
 import shutil
 import distutils.command.clean
 from pathlib import Path
@@ -9,22 +10,12 @@ from collections import OrderedDict
 
 from setuptools import setup, find_namespace_packages
 from pkg_resources import get_distribution, DistributionNotFound
+
 import torch
-from torch.utils.cpp_extension import CppExtension, CUDAExtension, CUDA_HOME
+from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDA_HOME, CUDAExtension
 
-from ml.shutil import run as sh
 from ml import logging
-
-named_arches = OrderedDict([
-    ('Kepler+Tesla', '3.7'),
-    ('Kepler', '3.5+PTX'),
-    ('Maxwell+Tegra', '5.3'),
-    ('Maxwell', '5.0;5.2+PTX'),
-    ('Pascal', '6.0;6.1+PTX'),
-    ('Volta', '7.0+PTX'),
-    ('Turing', '7.5+PTX'),
-    ('Ampere', '8.0;8.6+PTX'),
-])
+from ml.shutil import run as sh
 
 supported_arches = ['3.5', '3.7', '5.0', '5.2', '5.3', '6.0', '6.1', '6.2',
                     '7.0', '7.2', '7.5', '8.0', '8.6']
@@ -45,10 +36,11 @@ valid_arch_strings = supported_arches + [s + "+PTX" for s in supported_arches]
 #   – GTX/RTX Turing 
 #   – GTX 1660 Ti, RTX 2060, RTX 2070, RTX 2080, 
 #   - Titan RTX,
+# More: https://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/
 
 if not os.environ.get('TORCH_CUDA_ARCH_LIST'):
     os.environ['TORCH_CUDA_ARCH_LIST'] = ';'.join(valid_arch_strings)
-    logging.warn(f'TORCH_CUDA_ARCH_LIST not set, build based on all valid arch: {os.environ["TORCH_CUDA_ARCH_LIST"]}')
+    logging.warning(f'TORCH_CUDA_ARCH_LIST not set, build based on all valid arch: {os.environ["TORCH_CUDA_ARCH_LIST"]}')
     
 
 cwd = Path(__file__).parent
@@ -57,7 +49,7 @@ PKG = pkg.upper()
 
 def write_version_py(path, major=None, minor=None, patch=None, suffix='', sha='Unknown'):
     if major is None or minor is None or patch is None:
-        major, minor, patch = sh("git describe --abbrev=0 --tags")[1:].split('.')
+        major, minor, patch = sh("git tag --sort=taggerdate | tail -1")[1:].split('.')
         sha = sh("git rev-parse HEAD")
         logging.info(f"Build version {major}.{minor}.{patch}-{sha}")
 
@@ -98,62 +90,74 @@ def dist_info(pkgname):
 
 
 def ext_modules(pkg):
-    pkg_dir = cwd / pkg
-    extensions_dir = pkg_dir / 'csrc'
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    extensions_dir = os.path.join(this_dir, pkg, "csrc")
 
-    main_files = sorted(map(str, extensions_dir.glob('*.cpp')))
-    source_cpu = sorted(map(str, (extensions_dir / 'cpu').glob('*.cpp')))
-    source_cuda = sorted(map(str, (extensions_dir / 'cuda').glob('*.cu')))
+    main_file = glob.glob(os.path.join(extensions_dir, "*.cpp")) + glob.glob(
+        os.path.join(extensions_dir, "ops", "*.cpp")
+    )
+    source_cpu = (
+        glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+        + glob.glob(os.path.join(extensions_dir, "ops", "cpu", "*.cpp"))
+        + glob.glob(os.path.join(extensions_dir, "ops", "quantized", "cpu", "*.cpp"))
+    )
 
-    sources = main_files + source_cpu
+    print("Compiling extensions with following flags:")
+    force_cuda = os.getenv("FORCE_CUDA", "0") == "1"
+    print(f"  FORCE_CUDA: {force_cuda}")
+    debug_mode = os.getenv("DEBUG", "0") == "1"
+    print(f"  DEBUG: {debug_mode}")
+
+    nvcc_flags = os.getenv("NVCC_FLAGS", "")
+    print(f"  NVCC_FLAGS: {nvcc_flags}")
+
+    source_cuda = glob.glob(os.path.join(extensions_dir, "ops", "cuda", "*.cu"))
+    source_cuda += glob.glob(os.path.join(extensions_dir, "ops", "autocast", "*.cpp"))
+
+    sources = main_file + source_cpu
     extension = CppExtension
-    if not sources:
-        return []
-
-    test_dir = cwd / 'tests'
-    test_files = sorted(map(str, test_dir.glob('*.cpp')))
-    tests = test_files
 
     define_macros = []
-    extra_compile_args = {}
-    if (torch.cuda.is_available() and CUDA_HOME is not None) or os.getenv('FORCE_CUDA', '0') == '1':
+
+    extra_compile_args = {"cxx": []}
+    if (torch.cuda.is_available() and CUDA_HOME is not None) or force_cuda:
         extension = CUDAExtension
         sources += source_cuda
-        define_macros += [('WITH_CUDA', None)]
-        nvcc_flags = os.getenv('NVCC_FLAGS', '')
-        if nvcc_flags == '':
+
+        define_macros += [("WITH_CUDA", None)]
+        if nvcc_flags == "":
             nvcc_flags = []
         else:
-            nvcc_flags = nvcc_flags.split(' ')
-        extra_compile_args = {
-            'cxx': ['-O3'],
-            'nvcc': nvcc_flags,
-        }
+            nvcc_flags = nvcc_flags.split(" ")
+        extra_compile_args["nvcc"] = nvcc_flags
 
-    if sys.platform == 'win32':
-        define_macros += [('{pkg}_EXPORTS', None)]
+    if debug_mode:
+        print("Compiling in debug mode")
+        extra_compile_args["cxx"].append("-g")
+        extra_compile_args["cxx"].append("-O0")
+        if "nvcc" in extra_compile_args:
+            # we have to remove "-OX" and "-g" flag if exists and append
+            nvcc_flags = extra_compile_args["nvcc"]
+            extra_compile_args["nvcc"] = [f for f in nvcc_flags if not ("-O" in f or "-g" in f)]
+            extra_compile_args["nvcc"].append("-O0")
+            extra_compile_args["nvcc"].append("-g")
 
-    include_dirs = [str(extensions_dir)]
-    tests_include_dirs = [str(test_dir)]
+    sources = [os.path.join(extensions_dir, s) for s in sources]
+
+    include_dirs = [extensions_dir]
     ext_modules = [
         extension(
-            f'{pkg}._C',
-            sources,
+            f"{pkg}._C",
+            sorted(sources),
             include_dirs=include_dirs,
             define_macros=define_macros,
             extra_compile_args=extra_compile_args,
-        )]
-    if tests:
-        ext_modules.append(extension(
-            f'{pkg}._C_tests',
-            tests,
-            include_dirs=tests_include_dirs,
-            define_macros=define_macros,
-            extra_compile_args=extra_compile_args,
-        ))
+        )
+    ]
+
     return ext_modules
 
-# TODO
+
 class Clean(distutils.command.clean.clean):
     def run(self):
         import glob
@@ -192,16 +196,17 @@ if __name__ == '__main__':
     version = write_version_py(pkg.replace('-', '/'))
 
     cmdclass = dict(
-        build_ext=torch.utils.cpp_extension.BuildExtension,
+        build_ext=BuildExtension.with_options(no_python_abi_suffix=True),
         clean=Clean,
     )
-    extensions = [ext for ext in ext_modules(pkg.split('-')[0])]
+
+    extensions = [ext for ext in ext_modules(os.path.join(*pkg.split('-')))]
     name = sh('basename -s .git `git config --get remote.origin.url`').upper()
     logging.info(f"Building ml.vision with TORCH_CUDA_ARCH_LIST={os.environ['TORCH_CUDA_ARCH_LIST']}")
     setup(
         name=name,
         version=version,
-        author='Farley Lai',
+        author='Farley Lai;Deep Patel',
         url='https://github.com/necla-ml/ML-Vision',
         description=f"NECLA ML-Vision Library",
         long_description=readme(),
@@ -214,7 +219,7 @@ if __name__ == '__main__':
             'Intended Audience :: Developers',
             'Intended Audience :: Education',
             'Intended Audience :: Science/Research',
-            'Programming Language :: Python :: 3.7',
+            'Programming Language :: Python :: 3.9',
             'Topic :: Scientific/Engineering',
             'Topic :: Scientific/Engineering :: Mathematics',
             'Topic :: Scientific/Engineering :: Artificial Intelligence',
@@ -222,8 +227,9 @@ if __name__ == '__main__':
             'Topic :: Software Development :: Libraries',
             'Topic :: Software Development :: Libraries :: Python Modules',
         ],
-        namespace_packages=namespaces,
+        # namespace_packages=namespaces,
         packages=namespaces + packages,
+        package_data={name: ["*.dll", "*.dylib", "*.so", "prototype/datasets/_builtin/*.categories"]},
         install_requires=['ml'],
         ext_modules=extensions,
         cmdclass=cmdclass,

@@ -22,9 +22,5 @@ __all__ = [
     'nms',
     'roi_align',
     'roi_pool',
-    'roi_pool_pth',
-    'roi_pool_ma',
-    'RoIPool',
-    'RoIPoolMa',
     'MultiScaleFusionRoIAlign',
 ]

@@ -1,5 +1,4 @@
 import os
-from os import name
 from pathlib import Path
 from torchvision.datasets import coco
 from ... import logging
