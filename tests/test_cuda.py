@@ -34,7 +34,7 @@ def test_custom_roi_pool(IMG, GPU):
 
     fh, fw = list(feats.shape)[-2:]
     h, w = list(IMG.shape)[-2:]
-    scales = (fw/w, fh/h)
+    scales = (fh/h, fw/w)
     try:
         print(roi_pool.__module__)
         rois_feats = roi_pool(feats, [rois], output_size, scales).squeeze()

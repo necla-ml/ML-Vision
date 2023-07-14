@@ -1,7 +1,12 @@
+#include <float.h>
+
 #include <ATen/ATen.h>
-#include <ATen/TensorUtils.h>
-#include <TH/TH.h>
-#include <algorithm>
+#include <torch/library.h>
+
+namespace vision {
+namespace ops {
+
+namespace {
 
 template <class T>
 inline void add(T* address, const T& val) {
@@ -9,26 +14,26 @@ inline void add(T* address, const T& val) {
 }
 
 template <typename T>
-void RoIPoolForward(
+void roi_pool_forward_kernel_impl(
     const T* input,
-    const T spatial_scale_x,
-    const T spatial_scale_y,
-    const int channels,
-    const int height,
-    const int width,
-    const int pooled_height,
-    const int pooled_width,
+    const T spatial_scale_height,
+    const T spatial_scale_width,
+    int channels,
+    int height,
+    int width,
+    int pooled_height,
+    int pooled_width,
     const T* rois,
-    const int num_rois,
+    int num_rois,
     T* output,
     int* argmax_data) {
   for (int n = 0; n < num_rois; ++n) {
     const T* offset_rois = rois + n * 5;
     int roi_batch_ind = offset_rois[0];
-    int roi_start_w = round(offset_rois[1] * spatial_scale_x);
-    int roi_start_h = round(offset_rois[2] * spatial_scale_y);
-    int roi_end_w = round(offset_rois[3] * spatial_scale_x);
-    int roi_end_h = round(offset_rois[4] * spatial_scale_y);
+    int roi_start_w = round(offset_rois[1] * spatial_scale_width);
+    int roi_start_h = round(offset_rois[2] * spatial_scale_height);
+    int roi_end_w = round(offset_rois[3] * spatial_scale_width);
+    int roi_end_h = round(offset_rois[4] * spatial_scale_height);
 
     // Force malformed ROIs to be 1x1
     int roi_width = std::max(roi_end_w - roi_start_w + 1, 1);
@@ -79,21 +84,21 @@ void RoIPoolForward(
 }
 
 template <typename T>
-void RoIPoolBackward(
+void roi_pool_backward_kernel_impl(
     const T* grad_output,
     const int* argmax_data,
-    const int num_rois,
-    const int channels,
-    const int height,
-    const int width,
-    const int pooled_height,
-    const int pooled_width,
+    int num_rois,
+    int channels,
+    int height,
+    int width,
+    int pooled_height,
+    int pooled_width,
     T* grad_input,
     const T* rois,
-    const int n_stride,
-    const int c_stride,
-    const int h_stride,
-    const int w_stride) {
+    int n_stride,
+    int c_stride,
+    int h_stride,
+    int w_stride) {
   for (int n = 0; n < num_rois; ++n) {
     const T* offset_rois = rois + n * 5;
     int roi_batch_ind = offset_rois[0];
@@ -121,19 +126,19 @@ void RoIPoolBackward(
   } // num_rois
 }
 
-std::tuple<at::Tensor, at::Tensor> ROIPool_forward_cpu(
+std::tuple<at::Tensor, at::Tensor> roi_pool_forward_kernel(
     const at::Tensor& input,
     const at::Tensor& rois,
-    const float spatial_scale_x,
-    const float spatial_scale_y,
-    const int pooled_height,
-    const int pooled_width) {
-  AT_ASSERTM(input.device().is_cpu(), "input must be a CPU tensor");
-  AT_ASSERTM(rois.device().is_cpu(), "rois must be a CPU tensor");
+    double spatial_scale_height,
+    double spatial_scale_width,
+    int64_t pooled_height,
+    int64_t pooled_width) {
+  TORCH_CHECK(input.device().is_cpu(), "input must be a CPU tensor");
+  TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
 
   at::TensorArg input_t{input, "input", 1}, rois_t{rois, "rois", 2};
 
-  at::CheckedFrom c = "ROIPool_forward_cpu";
+  at::CheckedFrom c = "roi_pool_forward_kernel";
   at::checkAllSameType(c, {input_t, rois_t});
 
   int num_rois = rois.size(0);
@@ -151,44 +156,48 @@ std::tuple<at::Tensor, at::Tensor> ROIPool_forward_cpu(
     return std::make_tuple(output, argmax);
   }
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.type(), "ROIPool_forward", [&] {
-    RoIPoolForward<scalar_t>(
-        input.contiguous().data<scalar_t>(),
-        spatial_scale_x,
-        spatial_scale_y,
-        channels,
-        height,
-        width,
-        pooled_height,
-        pooled_width,
-        rois.contiguous().data<scalar_t>(),
-        num_rois,
-        output.data<scalar_t>(),
-        argmax.data<int>());
-  });
+  auto input_ = input.contiguous(), rois_ = rois.contiguous();
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      input.scalar_type(), "roi_pool_forward_kernel", [&] {
+        roi_pool_forward_kernel_impl<scalar_t>(
+            input_.data_ptr<scalar_t>(),
+            spatial_scale_height,
+            spatial_scale_width,
+            channels,
+            height,
+            width,
+            pooled_height,
+            pooled_width,
+            rois_.data_ptr<scalar_t>(),
+            num_rois,
+            output.data_ptr<scalar_t>(),
+            argmax.data_ptr<int>());
+      });
   return std::make_tuple(output, argmax);
 }
 
-at::Tensor ROIPool_backward_cpu(
+at::Tensor roi_pool_backward_kernel(
     const at::Tensor& grad,
     const at::Tensor& rois,
     const at::Tensor& argmax,
-    const float spatial_scale_x,
-    const float spatial_scale_y,
-    const int pooled_height,
-    const int pooled_width,
-    const int batch_size,
-    const int channels,
-    const int height,
-    const int width) {
+    double spatial_scale_height,
+    double spatial_scale_width,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t batch_size,
+    int64_t channels,
+    int64_t height,
+    int64_t width) {
   // Check if input tensors are CPU tensors
-  AT_ASSERTM(grad.device().is_cpu(), "grad must be a CPU tensor");
-  AT_ASSERTM(rois.device().is_cpu(), "rois must be a CPU tensor");
-  AT_ASSERTM(argmax.device().is_cpu(), "argmax must be a CPU tensor");
+  TORCH_CHECK(grad.device().is_cpu(), "grad must be a CPU tensor");
+  TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
+  TORCH_CHECK(argmax.device().is_cpu(), "argmax must be a CPU tensor");
+  TORCH_CHECK(
+      rois.size(1) == 5, "Tensor rois should have shape as Tensor[K, 5]");
 
   at::TensorArg grad_t{grad, "grad", 1}, rois_t{rois, "rois", 2};
 
-  at::CheckedFrom c = "ROIPool_backward_cpu";
+  at::CheckedFrom c = "roi_pool_backward_kernel";
   at::checkAllSameType(c, {grad_t, rois_t});
 
   auto num_rois = rois.size(0);
@@ -207,22 +216,38 @@ at::Tensor ROIPool_backward_cpu(
   int h_stride = grad.stride(2);
   int w_stride = grad.stride(3);
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(grad.type(), "ROIPool_backward", [&] {
-    RoIPoolBackward<scalar_t>(
-        grad.data<scalar_t>(),
-        argmax.data<int>(),
-        num_rois,
-        channels,
-        height,
-        width,
-        pooled_height,
-        pooled_width,
-        grad_input.data<scalar_t>(),
-        rois.contiguous().data<scalar_t>(),
-        n_stride,
-        c_stride,
-        h_stride,
-        w_stride);
-  });
+  auto rois_ = rois.contiguous();
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      grad.scalar_type(), "roi_pool_backward_kernel", [&] {
+        roi_pool_backward_kernel_impl<scalar_t>(
+            grad.data_ptr<scalar_t>(),
+            argmax.data_ptr<int>(),
+            num_rois,
+            channels,
+            height,
+            width,
+            pooled_height,
+            pooled_width,
+            grad_input.data_ptr<scalar_t>(),
+            rois_.data_ptr<scalar_t>(),
+            n_stride,
+            c_stride,
+            h_stride,
+            w_stride);
+      });
   return grad_input;
 }
+
+} // namespace
+
+TORCH_LIBRARY_IMPL(mlvision, CPU, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("mlvision::roi_pool"),
+      TORCH_FN(roi_pool_forward_kernel));
+  m.impl(
+      TORCH_SELECTIVE_NAME("mlvision::_roi_pool_backward"),
+      TORCH_FN(roi_pool_backward_kernel));
+}
+
+} // namespace ops
+} // namespace vision

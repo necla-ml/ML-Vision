@@ -1,3 +1,6 @@
+import os 
+import warnings
+
 import torch
 from ml import nn
 
@@ -10,6 +13,20 @@ from . import version
 from . import transforms
 from . import utils
 from . import io
+
+# load and register _C extensions
+from .extension import _HAS_OPS
+
+# Check if mlvision is being imported within the root folder
+if not _HAS_OPS and os.path.dirname(os.path.realpath(__file__)) == os.path.join(
+    os.path.realpath(os.getcwd()), "vision"
+):
+    message = (
+        "You are importing ml-vision within its own root folder ({}). "
+        "This is not expected to work and may give errors. Please exit the "
+        "torchvision project source and relaunch your python interpreter."
+    )
+    warnings.warn(message.format(os.getcwd()))
 
 AE   = 'AE'
 AE3  = '3AE'

@@ -1,22 +1,28 @@
 #include <ATen/ATen.h>
-#include <ATen/TensorUtils.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
-#include <ATen/cuda/CUDAApplyUtils.cuh>
+#include <float.h>
+#include <torch/library.h>
+#include <ATen/native/cuda/KernelUtils.cuh>
 
 #include "cuda_helpers.h"
 
+namespace vision {
+namespace ops {
+
+namespace {
+
 template <typename T>
-__global__ void RoIPoolForward(
-    const int nthreads,
+__global__ void roi_pool_forward_kernel_impl(
+    int nthreads,
     const T* input,
-    const T spatial_scale_x,
-    const T spatial_scale_y,
-    const int channels,
-    const int height,
-    const int width,
-    const int pooled_height,
-    const int pooled_width,
+    const T spatial_scale_height,
+    const T spatial_scale_width,
+    int channels,
+    int height,
+    int width,
+    int pooled_height,
+    int pooled_width,
     const T* rois,
     T* output,
     int* argmax_data) {
@@ -29,10 +35,10 @@ __global__ void RoIPoolForward(
 
     const T* offset_rois = rois + n * 5;
     int roi_batch_ind = offset_rois[0];
-    int roi_start_w = round(offset_rois[1] * spatial_scale_x);
-    int roi_start_h = round(offset_rois[2] * spatial_scale_y);
-    int roi_end_w = round(offset_rois[3] * spatial_scale_x);
-    int roi_end_h = round(offset_rois[4] * spatial_scale_y);
+    int roi_start_w = round(offset_rois[1] * spatial_scale_width);
+    int roi_start_h = round(offset_rois[2] * spatial_scale_height);
+    int roi_end_w = round(offset_rois[3] * spatial_scale_width);
+    int roi_end_h = round(offset_rois[4] * spatial_scale_height);
 
     // Force malformed ROIs to be 1x1
     int roi_width = max(roi_end_w - roi_start_w + 1, 1);
@@ -73,24 +79,25 @@ __global__ void RoIPoolForward(
 }
 
 template <typename T>
-__global__ void RoIPoolBackward(
-    const int nthreads,
+__global__ void roi_pool_backward_kernel_impl(
+    int nthreads,
     const T* grad_output,
     const int* argmax_data,
-    const int num_rois,
-    const T spatial_scale_x,
-    const T spatial_scale_y,
-    const int channels,
-    const int height,
-    const int width,
-    const int pooled_height,
-    const int pooled_width,
+    int num_rois,
+    const T spatial_scale_height,
+    const T spatial_scale_width,
+    int channels,
+    int height,
+    int width,
+    int pooled_height,
+    int pooled_width,
     T* grad_input,
     const T* rois,
-    const int n_stride,
-    const int c_stride,
-    const int h_stride,
-    const int w_stride) {
+    int n_stride,
+    int c_stride,
+    int h_stride,
+    int w_stride,
+    const int memory_span) {
   CUDA_1D_KERNEL_LOOP(index, nthreads) {
     // (n, c, ph, pw) is an element in the pooled output
     int pw = index % pooled_width;
@@ -100,36 +107,40 @@ __global__ void RoIPoolBackward(
 
     const T* offset_rois = rois + n * 5;
     int roi_batch_ind = offset_rois[0];
-    T* grad_input_offset =
-        grad_input + ((roi_batch_ind * channels + c) * height * width);
 
-    int output_offset = n * n_stride + c * c_stride;
+    const int output_offset = n * n_stride + c * c_stride;
     const int* argmax_data_offset =
         argmax_data + (n * channels + c) * pooled_height * pooled_width;
-    int argmax = argmax_data_offset[ph * pooled_width + pw];
+    const int argmax = argmax_data_offset[ph * pooled_width + pw];
+    const int offset = (roi_batch_ind * channels + c) * height * width;
 
     if (argmax != -1) {
-      atomicAdd(
-          grad_input_offset + argmax,
+      at::native::fastAtomicAdd(
+          grad_input,
+          offset + argmax,
+          memory_span,
           static_cast<T>(
-              grad_output[output_offset + ph * h_stride + pw * w_stride]));
+              grad_output[output_offset + ph * h_stride + pw * w_stride]),
+          true);
     }
   }
 }
 
-std::tuple<at::Tensor, at::Tensor> ROIPool_forward_cuda(
+std::tuple<at::Tensor, at::Tensor> roi_pool_forward_kernel(
     const at::Tensor& input,
     const at::Tensor& rois,
-    const float spatial_scale_x,
-    const float spatial_scale_y,
-    const int pooled_height,
-    const int pooled_width) {
-  AT_ASSERTM(input.device().is_cuda(), "input must be a CUDA tensor");
-  AT_ASSERTM(rois.device().is_cuda(), "rois must be a CUDA tensor");
+    double spatial_scale_height,
+    double spatial_scale_width,
+    int64_t pooled_height,
+    int64_t pooled_width) {
+  TORCH_CHECK(input.is_cuda(), "input must be a CUDA tensor");
+  TORCH_CHECK(rois.is_cuda(), "rois must be a CUDA tensor");
+  TORCH_CHECK(
+      rois.size(1) == 5, "Tensor rois should have shape as Tensor[K, 5]");
 
   at::TensorArg input_t{input, "input", 1}, rois_t{rois, "rois", 2};
 
-  at::CheckedFrom c = "ROIPool_forward_cuda";
+  at::CheckedFrom c = "roi_pool_forward_kernel";
   at::checkAllSameGPU(c, {input_t, rois_t});
   at::checkAllSameType(c, {input_t, rois_t});
 
@@ -150,8 +161,7 @@ std::tuple<at::Tensor, at::Tensor> ROIPool_forward_cuda(
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
 
   dim3 grid(std::min(
-      at::cuda::ATenCeilDiv(
-          static_cast<int64_t>(output_size), static_cast<int64_t>(512)),
+      ceil_div(static_cast<int64_t>(output_size), static_cast<int64_t>(512)),
       static_cast<int64_t>(4096)));
   dim3 block(512);
 
@@ -160,46 +170,48 @@ std::tuple<at::Tensor, at::Tensor> ROIPool_forward_cuda(
     return std::make_tuple(output, argmax);
   }
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.type(), "ROIPool_forward", [&] {
-    RoIPoolForward<scalar_t><<<grid, block, 0, stream>>>(
-        output_size,
-        input.contiguous().data<scalar_t>(),
-        spatial_scale_x,
-        spatial_scale_y,
-        channels,
-        height,
-        width,
-        pooled_height,
-        pooled_width,
-        rois.contiguous().data<scalar_t>(),
-        output.data<scalar_t>(),
-        argmax.data<int>());
-  });
+  auto input_ = input.contiguous(), rois_ = rois.contiguous();
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      input.scalar_type(), "roi_pool_forward_kernel", [&] {
+        roi_pool_forward_kernel_impl<scalar_t><<<grid, block, 0, stream>>>(
+            output_size,
+            input_.data_ptr<scalar_t>(),
+            spatial_scale_height,
+            spatial_scale_width,
+            channels,
+            height,
+            width,
+            pooled_height,
+            pooled_width,
+            rois_.data_ptr<scalar_t>(),
+            output.data_ptr<scalar_t>(),
+            argmax.data_ptr<int>());
+      });
   AT_CUDA_CHECK(cudaGetLastError());
   return std::make_tuple(output, argmax);
 }
 
-at::Tensor ROIPool_backward_cuda(
+at::Tensor roi_pool_backward_kernel(
     const at::Tensor& grad,
     const at::Tensor& rois,
     const at::Tensor& argmax,
-    const float spatial_scale_x,
-    const float spatial_scale_y,
-    const int pooled_height,
-    const int pooled_width,
-    const int batch_size,
-    const int channels,
-    const int height,
-    const int width) {
+    double spatial_scale_height,
+    double spatial_scale_width,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t batch_size,
+    int64_t channels,
+    int64_t height,
+    int64_t width) {
   // Check if input tensors are CUDA tensors
-  AT_ASSERTM(grad.device().is_cuda(), "grad must be a CUDA tensor");
-  AT_ASSERTM(rois.device().is_cuda(), "rois must be a CUDA tensor");
-  AT_ASSERTM(argmax.device().is_cuda(), "argmax must be a CUDA tensor");
+  TORCH_CHECK(grad.is_cuda(), "grad must be a CUDA tensor");
+  TORCH_CHECK(rois.is_cuda(), "rois must be a CUDA tensor");
+  TORCH_CHECK(argmax.is_cuda(), "argmax must be a CUDA tensor");
 
   at::TensorArg grad_t{grad, "grad", 1}, rois_t{rois, "rois", 2},
       argmax_t{argmax, "argmax", 3};
 
-  at::CheckedFrom c = "ROIPool_backward_cuda";
+  at::CheckedFrom c = "roi_pool_backward_kernel";
   at::checkAllSameGPU(c, {grad_t, rois_t, argmax_t});
   at::checkAllSameType(c, {grad_t, rois_t});
 
@@ -213,8 +225,7 @@ at::Tensor ROIPool_backward_cuda(
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
 
   dim3 grid(std::min(
-      at::cuda::ATenCeilDiv(
-          static_cast<int64_t>(grad.numel()), static_cast<int64_t>(512)),
+      ceil_div(static_cast<int64_t>(grad.numel()), static_cast<int64_t>(512)),
       static_cast<int64_t>(4096)));
   dim3 block(512);
 
@@ -229,26 +240,45 @@ at::Tensor ROIPool_backward_cuda(
   int h_stride = grad.stride(2);
   int w_stride = grad.stride(3);
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(grad.type(), "ROIPool_backward", [&] {
-    RoIPoolBackward<scalar_t><<<grid, block, 0, stream>>>(
-        grad.numel(),
-        grad.data<scalar_t>(),
-        argmax.contiguous().data<int>(),
-        num_rois,
-        spatial_scale_x,
-        spatial_scale_y,
-        channels,
-        height,
-        width,
-        pooled_height,
-        pooled_width,
-        grad_input.data<scalar_t>(),
-        rois.contiguous().data<scalar_t>(),
-        n_stride,
-        c_stride,
-        h_stride,
-        w_stride);
-  });
+  at::globalContext().alertNotDeterministic("roi_pool_backward_kernel");
+
+  auto argmax_ = argmax.contiguous(), rois_ = rois.contiguous();
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      grad.scalar_type(), "roi_pool_backward_kernel", [&] {
+        roi_pool_backward_kernel_impl<scalar_t><<<grid, block, 0, stream>>>(
+            grad.numel(),
+            grad.data_ptr<scalar_t>(),
+            argmax_.data_ptr<int>(),
+            num_rois,
+            spatial_scale_height,
+            spatial_scale_width,
+            channels,
+            height,
+            width,
+            pooled_height,
+            pooled_width,
+            grad_input.data_ptr<scalar_t>(),
+            rois_.data_ptr<scalar_t>(),
+            n_stride,
+            c_stride,
+            h_stride,
+            w_stride,
+            grad_input.numel());
+      });
   AT_CUDA_CHECK(cudaGetLastError());
   return grad_input;
 }
+
+} // namespace
+
+TORCH_LIBRARY_IMPL(mlvision, CUDA, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("mlvision::roi_pool"),
+      TORCH_FN(roi_pool_forward_kernel));
+  m.impl(
+      TORCH_SELECTIVE_NAME("mlvision::_roi_pool_backward"),
+      TORCH_FN(roi_pool_backward_kernel));
+}
+
+} // namespace ops
+} // namespace vision
