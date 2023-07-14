@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 
 import os
-import sys
 import glob
 import shutil
-import distutils.command.clean
 from pathlib import Path
-from collections import OrderedDict
+import distutils.command.clean
 
 from setuptools import setup, find_namespace_packages
 from pkg_resources import get_distribution, DistributionNotFound
