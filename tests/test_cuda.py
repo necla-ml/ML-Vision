@@ -3,10 +3,6 @@ import numpy as np
 import torch as th
 
 from ml import logging
-from ml.vision.ops import (
-    roi_align,
-    roi_pool,
-)
 
 @pytest.fixture
 def CPU():
@@ -21,8 +17,12 @@ def IMG():
     H, W = 720, 1280
     return th.rand(1, 3, H, W)
 
-@pytest.mark.essential
+# @pytest.mark.essential
 def test_custom_roi_pool(IMG, GPU):
+    from ml.vision.ops import (
+        roi_align,
+        roi_pool,
+    )
     H, W = IMG.shape[-2:]
     feats = th.rand(1, 1, IMG.shape[-2] // 16, IMG.shape[-1] // 16)
     output_size = (7, 7)

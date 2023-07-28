@@ -1,10 +1,14 @@
 from functools import partial
+
 import torch
 from torch import nn
-from torchvision.ops.misc import FrozenBatchNorm2d
+
 from torchvision.models.resnet import _resnet
-from torchvision.models.detection.backbone_utils import BackboneWithFPN
+from torchvision.models import get_model_weights
 from torchvision.models.resnet import Bottleneck
+from torchvision.ops.misc import FrozenBatchNorm2d
+from torchvision.models.detection.backbone_utils import BackboneWithFPN
+
 
 class Backbone(nn.Module):
     r"""Select a subset of feature maps from a model to make a backbone with or without FPN.
@@ -76,7 +80,8 @@ class Backbone(nn.Module):
         # Save some checkpoint
         return self.backbone.body.state_dict(destination=destination, prefix=prefix, keep_vars=keep_vars)
 
-def resnet50(pretrained=False, fpn=False, frozen=True, exceptions=['layer2', 'layer3', 'layer4'], classifier=False, progress=True, **kwargs):
+
+def resnet50(fpn=False, frozen=True, exceptions=['layer2', 'layer3', 'layer4'], classifier=False, progress=True, **kwargs):
     r"""ResNet50 model from
     [Deep Residual Learning for Image Recognition](https://arxiv.org/pdf/1512.03385.pdf)
     The keyward argument `norm_layer` defaults to BatchNorm2d.
@@ -90,7 +95,6 @@ def resnet50(pretrained=False, fpn=False, frozen=True, exceptions=['layer2', 'la
         exceptions (List[str]): keywords of layers not to freeze
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-
     arch = f"resnet50"
     kwargs['norm_layer'] = kwargs.get('norm_layer', partial(FrozenBatchNorm2d, eps=1e-5) if frozen else None)
     if fpn:
@@ -105,13 +109,14 @@ def resnet50(pretrained=False, fpn=False, frozen=True, exceptions=['layer2', 'la
         in_channels_stage2 * 8,
     ]
     out_channels = kwargs.get('out_channels', 256)
-    model = _resnet(arch, Bottleneck, [3, 4, 6, 3], pretrained, progress, **kwargs)
+    weights = get_model_weights(arch).DEFAULT
+    model = _resnet(Bottleneck, [3, 4, 6, 3], weights, progress, **kwargs)
     backbone = Backbone(model, return_layers, in_channels_list, out_channels, fpn=fpn, classifier=classifier)
     backbone.freeze(exceptions)
     return backbone
 
 
-def resnet101(pretrained=False, fpn=False, frozen=True, exceptions=['layer2', 'layer3', 'layer4'], classifier=False, progress=True, **kwargs):
+def resnet101(fpn=False, frozen=True, exceptions=['layer2', 'layer3', 'layer4'], classifier=False, progress=True, **kwargs):
     r"""ResNet-101 model from
     [Deep Residual Learning for Image Recognition](https://arxiv.org/pdf/1512.03385.pdf)
     The keyward argument `norm_layer` defaults to BatchNorm2d.
@@ -140,13 +145,14 @@ def resnet101(pretrained=False, fpn=False, frozen=True, exceptions=['layer2', 'l
         in_channels_stage2 * 8,
     ]
     out_channels = kwargs.get('out_channels', 256)
-    model = _resnet(arch, Bottleneck, [3, 4, 23, 3], pretrained, progress, **kwargs)
+    weights = get_model_weights(arch).DEFAULT
+    model = _resnet(Bottleneck, [3, 4, 23, 3], weights, progress, **kwargs)
     backbone = Backbone(model, return_layers, in_channels_list, out_channels, fpn=fpn, classifier=classifier)
     backbone.freeze(exceptions)
     return backbone
 
 
-def resnext101(pretrained=False, fpn=False, frozen=True, exceptions=['layer2', 'layer3', 'layer4'], classifier=False, progress=True, **kwargs):
+def resnext101_wsl(fpn=False, frozen=True, exceptions=['layer2', 'layer3', 'layer4'], classifier=False, progress=True, **kwargs):
     kwargs['groups'] = gs = kwargs.get('groups', 32)
     kwargs['width_per_group'] = gw = kwargs.get('width_per_group', 8)
     kwargs['norm_layer'] = kwargs.get('norm_layer', partial(FrozenBatchNorm2d, eps=1e-5) if frozen else None)
@@ -163,15 +169,10 @@ def resnext101(pretrained=False, fpn=False, frozen=True, exceptions=['layer2', '
         in_channels_stage2 * 8,
     ]
     out_channels = kwargs.get('out_channels', 256)
-    
-    if pretrained and gs == 32 and gw == 8:
-        # WSL
-        WSL = torch.hub.load('facebookresearch/WSL-Images', 'resnext101_32x8d_wsl', **kwargs)
-        backbone = Backbone(WSL, return_layers, in_channels_list, out_channels, fpn=fpn, classifier=classifier)
-    else:
-        # torchvision
-        arch = f"resnext101_{gs}x{gw}d"
-        model = _resnet(arch, Bottleneck, [3, 4, 23, 3], pretrained, progress, **kwargs)
-        backbone = Backbone(model, return_layers, in_channels_list, out_channels, fpn=fpn, classifier=classifier)
+
+    arch = f"resnext101_{gs}x{gw}d_wsl"
+    WSL = torch.hub.load('facebookresearch/WSL-Images', arch, **kwargs)
+    backbone = Backbone(WSL, return_layers, in_channels_list, out_channels, fpn=fpn, classifier=classifier)
+
     backbone.freeze(exceptions)
     return backbone

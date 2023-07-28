@@ -1,7 +1,10 @@
 from pathlib import Path
+
 from PIL import Image
-from torchvision.datasets import VisionDataset
+
 import torch
+from torchvision.datasets import VisionDataset
+
 from ml import logging
 
 WIDERPERSON_CLASSES = [

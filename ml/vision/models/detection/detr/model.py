@@ -80,7 +80,6 @@ def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
             m._non_persistent_buffers_set = set()
     return model.float().state_dict()
     '''
-    print(chkpt.keys())
     return chkpt['model']
 
 def detr(pretrained=False, deformable=False, backbone='resnet50', num_classes=91, model_dir=None, force_reload=False, unload_after=False, **kwargs):

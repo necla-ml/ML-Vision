@@ -15,32 +15,8 @@ from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDA_HOME, C
 from ml import logging
 from ml.shutil import run as sh
 
-supported_arches = ['3.5', '3.7', '5.0', '5.2', '5.3', '6.0', '6.1', '6.2',
-                    '7.0', '7.2', '7.5', '8.0', '8.6']
-
-valid_arch_strings = supported_arches + [s + "+PTX" for s in supported_arches]
-
-# SM52 or SM_52, compute_52 
-#   – Quadro M6000, 
-#   - GeForce 900, GTX-970, GTX-980, 
-#   - GTX Titan X
-# SM61 or SM_61, compute_61 
-#   – GTX 1080, GTX 1070, GTX 1060, GTX 1050, GTX 1030,
-#   - Titan Xp, Tesla P40, Tesla P4, 
-#   - Discrete GPU on the NVIDIA Drive PX2
-# SM70 or SM_70, compute_70
-#   - Titan V 
-# SM75 or SM_75, compute_75 
-#   – GTX/RTX Turing 
-#   – GTX 1660 Ti, RTX 2060, RTX 2070, RTX 2080, 
-#   - Titan RTX,
-# More: https://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/
-
-if not os.environ.get('TORCH_CUDA_ARCH_LIST'):
-    os.environ['TORCH_CUDA_ARCH_LIST'] = ';'.join(valid_arch_strings)
-    logging.warning(f'TORCH_CUDA_ARCH_LIST not set, build based on all valid arch: {os.environ["TORCH_CUDA_ARCH_LIST"]}')
+BUILD_CUSTOM_EXT = os.getenv('BUILD_CUSTOM_EXT')
     
-
 cwd = Path(__file__).parent
 pkg = sh('basename -s .git `git config --get remote.origin.url`').lower()
 PKG = pkg.upper()
@@ -198,9 +174,10 @@ if __name__ == '__main__':
         clean=Clean,
     )
 
-    extensions = [ext for ext in ext_modules(os.path.join(*pkg.split('-')))]
+    extensions = BUILD_CUSTOM_EXT and [ext for ext in ext_modules(os.path.join(*pkg.split('-')))] or []
+    logging.info(f'{BUILD_CUSTOM_EXT=}')
     name = sh('basename -s .git `git config --get remote.origin.url`').upper()
-    logging.info(f"Building ml.vision with TORCH_CUDA_ARCH_LIST={os.environ['TORCH_CUDA_ARCH_LIST']}")
+    # logging.info(f"Building ml.vision with TORCH_CUDA_ARCH_LIST={os.environ['TORCH_CUDA_ARCH_LIST']}")
     setup(
         name=name,
         version=version,
@@ -233,11 +210,6 @@ if __name__ == '__main__':
         cmdclass=cmdclass,
         entry_points=dict(
             console_scripts=[
-                'mlv=ml.vision.cli.main:launch',
-                'convert_dataset_yolo5=ml.vision.scripts:convert_dataset_yolo5',
-                'make_dataset_yolo5=ml.vision.scripts:make_dataset_yolo5',
-                'train_yolo5=ml.vision.scripts:train_yolo5',
-                'deploy_yolo5=ml.vision.scripts:deploy_yolo5',
                 'track_video=ml.vision.scripts:track_video',
             ]
         ),

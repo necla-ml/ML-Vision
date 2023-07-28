@@ -1,9 +1,18 @@
+import warnings
+
 import torch
+from torch import nn
 from torch.nn import functional as F
 
-from ... import nn
-from .roi_align import roi_align
-from .utils import rois2boxes
+NON_SQUARE_SPATIAL_SCALE = None
+try:
+    from .roi_align import roi_align
+except ImportError as e:
+    from torchvision.ops import roi_align
+    warnings.warn(f'Using `roi_align from torchvision, hence spatial_scales for different height and width (non-square) are not supported')
+finally:
+    NON_SQUARE_SPATIAL_SCALE = True
+
 
 class MultiScaleFusionRoIAlign(nn.Module):
     def __init__(self, output_size, sampling_ratio=-1, aligned=False):
@@ -20,7 +29,7 @@ class MultiScaleFusionRoIAlign(nn.Module):
         self.sampling_ratio = sampling_ratio
         self.aligned = aligned
 
-    def forward(self, x, boxes, metas):
+    def forward(self, x, boxes, ratio):
         """
         Args:
             x (List[Tensor]): list of batch multi-scale feature maps from small scale to largest.
@@ -37,14 +46,11 @@ class MultiScaleFusionRoIAlign(nn.Module):
         batch = torch.cat(resampled, 1)
 
         # XXX pooling w.r.t. the resized/padded image sizes
-        if torch.is_tensor(boxes):
-            rois = rois2boxes(rois.clone(), len(metas))
-        else:
-            rois = [dets_f[:,:4].clone() for dets_f in boxes]
+        rois = [dets_f[:,:4].clone() for dets_f in boxes]
 
         rois_rp = []
         scale = None
-        for dets_rp, meta in zip(rois, metas):
+        for dets_rp, meta in zip(rois, ratio):
             rH, rW = meta['ratio']
             top, left = meta['offset']
             dets_rp[:, [0, 2]] = dets_rp[:, [0, 2]] * rW + left
@@ -54,7 +60,7 @@ class MultiScaleFusionRoIAlign(nn.Module):
                 shape = list(meta['shape'])
                 shape[0] = int(shape[0] * rH + 2 * top)
                 shape[1] = int(shape[1] * rW + 2 * left)
-                scale = (size[0]/shape[0], size[1]/shape[1])
+                scale = NON_SQUARE_SPATIAL_SCALE and (size[0]/shape[0], size[1]/shape[1]) or (size[0] / shape[0])
         
         # FIXME roi_align() is very slow when output_size is small
         if self.output_size[0] == 1:

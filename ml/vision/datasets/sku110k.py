@@ -1,8 +1,11 @@
-from collections import defaultdict
 from pathlib import Path
+from collections import defaultdict
+
 from PIL import Image
-from torchvision.datasets import VisionDataset
+
 import torch
+from torchvision.datasets import VisionDataset
+
 from ml import logging
 
 SKU110K_CLASSES = [ 'object' ]
