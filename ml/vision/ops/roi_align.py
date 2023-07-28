@@ -7,9 +7,9 @@ from torch import nn, Tensor
 from torch.jit.annotations import BroadcastingList2
 from torch.nn.modules.utils import _pair
 
-from ml.vision.extension import _assert_has_ops, _has_ops
-from .utils import check_roi_boxes_shape, convert_boxes_to_roi_format
+from torchvision.ops._utils import check_roi_boxes_shape, convert_boxes_to_roi_format
 
+from ml.vision.extension import _assert_has_ops, _has_ops
 
 # NB: all inputs are tensors
 def _bilinear_interpolate(

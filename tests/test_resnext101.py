@@ -1,14 +1,11 @@
-import os
 from pathlib import Path
 
 import pytest
-import numpy as np
+
 import torch as th
-from ml.vision.transforms import functional as TF
-from ml.vision import transforms
-from ml.vision.ops import clip_boxes_to_image
-from ml import nn
-import ml
+
+from torchvision import transforms
+from torchvision.ops import clip_boxes_to_image
 
 from .fixtures import *
 
@@ -45,8 +42,8 @@ def dets():
 
 @pytest.fixture
 def model(dev):
-    from ml.vision.models.backbone import resnext101
-    model = resnext101(pretrained=True, groups=32, width_per_group=8)
+    from ml.vision.models.backbone import resnext101_wsl
+    model = resnext101_wsl(groups=32, width_per_group=8)
     model.eval()
     model.to(dev)
     return model

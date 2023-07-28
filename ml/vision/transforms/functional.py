@@ -1,55 +1,17 @@
 """Functional transformation depending on the input format.
-
-Supported formats:
-- Tensor (RGB, CHW)
-- PIL (RGB, HWC)
-- cv2 (BGR, HWC)
-
-Conversions:
-- toTensor
-- toPIL
-- toCV
 """
-import numpy as np
-import torch as th
-from torch.nn import functional as F
 from torchvision.transforms import functional as TF
-from torchvision.transforms.functional import *
+from torchvision.transforms.functional import InterpolationMode
 
-try:
-    import accimage
-except Exception as e:
-    accimage = None
-
-def is_tensor(img):
-    return th.is_tensor(img) and img.dtype == th.uint8 # and img.shape[0] in (1, 3)
-
-def is_cv2(img):
-    if isinstance(img, np.ndarray):
-        if img.ndim == 3:
-            return img.shape[-1] in (1, 3) and img.dtype == np.uint8
-        else:
-            return img.ndim == 2 and img.dtype == np.uint8
-
-def is_accimage(img):
-    return accimage is not None and isinstance(img, accimage.Image)
-
-def is_pil(img):
-    from ml.av.backend.pil import Image
-    if accimage is not None:
-        return isinstance(img, (Image.Image, accimage.Image))
-    else:
-        return isinstance(img, Image.Image)
 
 def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shorter', antialias=False, **kwargs):
-    '''Resize input image of PIL/accimage, OpenCV BGR or torch tensor.
+    '''Resize input image of torch tensor.
     Args:
         size(Tuple[int], int): tuple of height and width or length on both sides following torchvision resize semantics
     '''
 
     r"""Resize the input image to the given size.
-    If the image is torch Tensor, it is expected
-    to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions
+    The image is is expected to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions
     Args:
         img (PIL Image or Tensor or cv2 numpy): Image to be resized.
         size (sequence or int): Desired output size. If size is a sequence like
@@ -72,15 +34,9 @@ def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shor
             .. warning::
                 There is no autodiff support for ``antialias=True`` option with input ``img`` as Tensor.
     Returns:
-        PIL Image or Tensor: Resized image.
+        Tensor: Resized image.
     """
-    if is_tensor(img):
-        H, W = img.shape[-2:]
-    elif is_cv2(img):
-        H, W = img.shape[:2]
-    else:
-        # PIL
-        W, H = img.size
+    H, W = img.shape[-2:]
     if isinstance(size, int):
         # with aspect ratio preserved
         if constraint == 'longer':
@@ -93,12 +49,7 @@ def resize(img, size, interpolation=InterpolationMode.BILINEAR, constraint='shor
                 w, h = int(W / H * size), size
             else:
                 w, h = size, int(H / W * size)
-            # return TF.resize(img, size, interpolation, **kwargs)
     else:
         h, w = size
-    
-    if is_cv2(img):
-        from ml.av.backend import opencv as cv
-        return cv.resize(img, (w, h), interpolation=cv.INTER_LINEAR)
-    else:
-        return TF.resize(img, (h, w), interpolation, antialias=antialias, **kwargs)
+
+    return TF.resize(img, (h, w), interpolation, antialias=antialias, **kwargs)

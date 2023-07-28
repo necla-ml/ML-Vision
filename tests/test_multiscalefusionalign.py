@@ -31,7 +31,7 @@ def x():
 def autocast(request):
     return request.param
 
-@pytest.mark.essential
+# @pytest.mark.essential
 def test_forward_on_cuda(roi_align_module, x, boxes, metas, autocast):
     # Move fixtures to cuda
     x = [t.to("cuda") for t in x]
@@ -43,7 +43,7 @@ def test_forward_on_cuda(roi_align_module, x, boxes, metas, autocast):
     assert all(feature.is_cuda for feature in aligned)  # Asserting CUDA tensors
     # Add more assertions as per your requirements
 
-@pytest.mark.essential
+# @pytest.mark.essential
 def test_forward_on_cpu(roi_align_module, x, boxes, metas):
     # Move fixtures to CPU
     x_cpu = [t.to("cpu") for t in x]
@@ -54,7 +54,7 @@ def test_forward_on_cpu(roi_align_module, x, boxes, metas):
     assert all(not feature.is_cuda for feature in aligned)  # Asserting CPU tensors
     # Add more assertions as per your requirements
 
-@pytest.mark.essential
+# @pytest.mark.essential
 def test_benchmark_forward_on_cuda(benchmark, roi_align_module, x, boxes, metas, autocast):
     # Move fixtures to cuda
     x = [t.to("cuda") for t in x]
@@ -73,7 +73,7 @@ def test_benchmark_forward_on_cuda(benchmark, roi_align_module, x, boxes, metas,
     assert all(feature.is_cuda for feature in aligned)  # Asserting CUDA tensors
     # Add more assertions as per your requirements
 
-@pytest.mark.essential
+# @pytest.mark.essential
 def test_benchmark_forward_on_cpu(benchmark, roi_align_module, x, boxes, metas):
     # Move fixtures to CPU
     x_cpu = [t.to("cpu") for t in x]

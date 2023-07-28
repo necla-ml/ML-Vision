@@ -1,17 +1,7 @@
 import pytest
 import torch as th
 
-YOLO5_TAG_SZ = {
-    'v1.0':736,
-    'v2.0':672,
-    'v3.0':640,
-    'v5.0':640,
-    'v6.0':640
-}
-
-@pytest.fixture
-def vid():
-    return th.randint(0, 255, (5, 1080, 810, 3), dtype=th.uint8)
+th.cuda.empty_cache()
 
 @pytest.fixture
 def xyxy():
@@ -54,33 +44,15 @@ def xyxysc():
 @pytest.fixture
 def tile_img():
     return 'assets/bus_zidane_tiles.jpg'
-    # TODO download and cache test images
-    # return '../yolov3/data/samples/tiles.jpg'
-    #return '../yolov3/data/samples/bus.jpg'
-    #return '../yolov3/data/samples/zidane.jpg'
-    #return '/zdata/projects/shared/datasets/WiderPerson/Images/005014.jpg'
-    #return '/zdata/projects/shared/datasets/SKU110K/images/test_100.jpg'
-
-@pytest.fixture
-def sku_img():
-    'assets/sku110k-test_100.jpg',
-
-@pytest.fixture
-def wp_img():
-    'assets/wider_person-005014.jpg',
 
 @pytest.fixture
 def img():
     return th.randint(0, 255, (3, 1080, 810), dtype=th.uint8)
-    
-@pytest.fixture
-def video():
-    import os
-    return '/zdata/projects/shared/datasets/kinetics400/frames-5fps/val/abseiling/GwlcmI36imo_000127_000137'
-    return os.path.join(os.environ['HOME'], 'Videos', 'GwlcmI36imo_000127_000137.mp4')
-    return os.path.join(os.environ['HOME'], 'Videos', 'store720p-short.264')
-    return os.path.join(os.environ['HOME'], 'Videos', 'calstore-concealing.mp4')
 
+@pytest.fixture
+def vid():
+    return th.randint(0, 255, (10, 1080, 810, 3), dtype=th.uint8)
+    
 @pytest.fixture
 def model_dir():
     return '/tmp/ml'

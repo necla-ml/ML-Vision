@@ -6,18 +6,18 @@ def preprocess(images, transform=None):
     Apply transform to batch of image
 
     Parameters:
-        images: List[Tensor[N, C, H, W]] or List[ndarray(N, C, H, W)]
+        images: Tensor[N, C, H, W] or List[Tensor[C, H, W]]
         transform: Torch transform 
     Returns:
         batch: Transformed batch of image tensors
         sizes: Original image sizes before transform
     """
-    if isinstance(images[0], np.ndarray):
-        batch = torch.stack([transform(torch.from_numpy(im)) for im in images])
+    if isinstance(images, torch.Tensor):
+        batch = transform(images)
+        sizes = [batch[0].shape[1:]] * len(batch)
     else:
         batch = torch.stack([transform(im) for im in images])
-
-    sizes = [im.shape[1:] for im in images]
+        sizes = [im.shape[1:] for im in images]
 
     return batch.float(), sizes
 
