@@ -2,8 +2,10 @@ import sys
 from pathlib import Path
 
 import torch
-from ml import io, nn, hub, logging
-from ml.nn import functional as F
+from torch import hub
+
+import ml.hub as ml_hub
+from ml import io, logging
 
 GITHUB_DETR = dict(
     owner='facebookresearch',
@@ -29,10 +31,10 @@ TAGS_DEFORMABLE_DETR = {
 def github(tag='main', deformable=False):
     if deformable:
         tag = TAGS_DEFORMABLE_DETR[tag]
-        return hub.github(owner=GITHUB_DEFORMABLE_DETR['owner'], project=GITHUB_DEFORMABLE_DETR['project'], tag=tag)
+        return ml_hub.github(owner=GITHUB_DEFORMABLE_DETR['owner'], project=GITHUB_DEFORMABLE_DETR['project'], tag=tag)
     else:
         tag = TAGS_DETR[tag]
-        return hub.github(owner=GITHUB_DETR['owner'], project=GITHUB_DETR['project'], tag=tag)
+        return ml_hub.github(owner=GITHUB_DETR['owner'], project=GITHUB_DETR['project'], tag=tag)
 
 def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
     # TODO naming for custom checkpoints
@@ -65,7 +67,7 @@ def from_pretrained(chkpt, model_dir=None, force_reload=False, **kwargs):
         # GitHub Release
         owner = kwargs.get('owner', GITHUB_DETR['owner'])
         proj = kwargs.get('project', GITHUB_DETR['project'])
-        url = hub.github_release_url(owner, proj, tag, chkpt)
+        url = ml_hub.github_release_url(owner, proj, tag, chkpt)
         chkpt = hub.load_state_dict_from_url(url, 
                                              model_dir=model_dir, 
                                              map_location=torch.device('cpu'),

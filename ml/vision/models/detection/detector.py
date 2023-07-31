@@ -1,11 +1,13 @@
 import os
+import random
 from abc import abstractmethod
 from pathlib import Path
 
 import torch as th
+from torch import nn
 import torchvision.transforms as T
 
-from ml import nn, random, logging
+from ml import logging
 from ...datasets import coco
 
 COLORS91 = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(coco.COCO91_CLASSES))]

@@ -189,7 +189,7 @@ if __name__ == '__main__':
         license='BSD-3',
         classifiers=[
             'License :: OSI Approved :: BSD License',
-            'Operating System :: macOS/Ubuntu 16.04+',
+            'Operating System :: macOS/Ubuntu 18.04+',
             'Development Status :: 1 - Alpha',
             'Intended Audience :: Developers',
             'Intended Audience :: Education',
