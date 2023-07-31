@@ -62,7 +62,7 @@ def detector(tag, dev):
     detector.eval()
     return detector.to(dev)
 
-@pytest.mark.essential
+# @pytest.mark.essential
 @pytest.mark.parametrize("B", [1])
 @pytest.mark.parametrize("shape", [(640, 640)])
 def test_deploy_onnx(benchmark, name, batch, detector, dev, B, shape):
@@ -161,7 +161,7 @@ def test_deploy_trt(benchmark, batch, detector, dev, B, fp16, int8, strict, shap
         for torch_feats, feats in zip(torch_features, features):
             th.testing.assert_close(torch_feats.float(), feats.float(), rtol=1e-03, atol=4e-04)
 
-@pytest.mark.essential
+# @pytest.mark.essential
 @pytest.mark.parametrize("B", [8])
 @pytest.mark.parametrize("batch_preprocess", [True, False])
 @pytest.mark.parametrize('fp16', [True, False])

@@ -3,8 +3,11 @@ import types
 from pathlib import Path
 
 import torch
+from torch import hub
 
-from ml import hub, logging
+from ml import logging
+import ml.hub as ml_hub
+
 
 GITHUB_YOLOX = dict(
     owner='Megvii-BaseDetection',
@@ -18,7 +21,7 @@ TAGS_YOLOX = {
 
 def github(tag='main', deformable=False):
     tag = TAGS_YOLOX[tag]
-    return hub.github(owner=GITHUB_YOLOX['owner'], project=GITHUB_YOLOX['project'], tag=tag)
+    return ml_hub.github(owner=GITHUB_YOLOX['owner'], project=GITHUB_YOLOX['project'], tag=tag)
 
 def custom_forward(self, x, targets=None):
     # fpn output content features of [dark3, dark4, dark5]
